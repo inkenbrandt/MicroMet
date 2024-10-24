@@ -1,10 +1,8 @@
 # Written By Kat Ladig and Paul Inkenbrandt
 
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 import pathlib
-from sqlalchemy import create_engine
 import configparser
 import datetime
 
@@ -114,12 +112,12 @@ well_soils = ["SWC_3_1_1", "SWC_4_1_1", "K_3_1_1", "TS_3_1_1", "EC_3_1_1",
               "SWC_3_9_1", "K_3_9_1", "TS_3_9_1", "EC_3_9_1", ]
 
 bflat = list(filter(lambda item: item not in ('TA_1_1_4', 'TS_1_1_2', 'SWC_1_1_2'), default))
-wellington = list(filter(lambda item: item not in ('TS_1_1_1'), default))
+wellington = list(filter(lambda item: item not in 'TS_1_1_1', default))
 big_math = wellington[:-10] + math_soils + wellington[-10:] + ['T_CANOPY']
 big_math_v2 = wellington[:-10] + math_soils_v2 + wellington[-7:] + ['T_CANOPY']
-big_math_v2_filt = list(filter(lambda item: item not in ('TA_1_1_4'), big_math_v2))
+big_math_v2_filt = list(filter(lambda item: item not in 'TA_1_1_4', big_math_v2))
 
-big_well = list(filter(lambda item: item not in ('TA_1_1_4'), default)) + well_soils
+big_well = list(filter(lambda item: item not in 'TA_1_1_4', default)) + well_soils
 header_dict = {60: default, 57: bflat, 59: wellington, 96: big_well, 131: big_math, 132: big_math_v2_filt}
 
 
@@ -364,7 +362,7 @@ class Reformatter(object):
             elif col in ['TIMESTAMP_START', 'TIMESTAMP_END', 'RECORD']:
                 self.et_data[col] = self.et_data[col].astype(np.int64)
             elif "SSITC" in col:
-                self.et_data[col] = self.et_data[col].astype(np.int8)
+                self.et_data[col] = self.et_data[col].astype(np.int16)
             else:
                 self.et_data[col] = self.et_data[col].astype(np.float32)
 
@@ -561,7 +559,7 @@ class Reformatter(object):
         avg = np.nanmean(arr)
         avgdiff = stdd - np.abs(arr - avg)
         y = np.where(avgdiff >= 0, arr, np.nan)
-        nans, x = np.isnan(y), lambda z: z.nonzero()[0]
+        #nans, x = np.isnan(y), lambda z: z.nonzero()[0]
         #if len(x(~nans)) > 0:
         #    y[nans] = np.interp(x(nans), x(~nans), y[~nans])
         return y
@@ -662,7 +660,7 @@ def outfile(df, stationname, out_dir):
     """
     first_index = pd.to_datetime(df['TIMESTAMP_START'][0], format ='%Y%m%d%H%M')
     last_index = pd.to_datetime(df['TIMESTAMP_END'][-1], format ='%Y%m%d%H%M')#df.index[-1], format ='%Y%m%d%H%M')
-    filename = stationname + f"HH{first_index.strftime('%Y%m%d%H%M')}_{last_index.strftime('%Y%m%d%H%M')}.csv" #{last_index_plus_30min.strftime('%Y%m%d%H%M')}.csv"
+    filename = stationname  + f"_HH_{first_index.strftime('%Y%m%d%H%M')}_{last_index.strftime('%Y%m%d%H%M')}.csv" #{last_index_plus_30min.strftime('%Y%m%d%H%M')}.csv"
     df.to_csv(out_dir + stationname + "/" + filename)
 
 if __name__ == '__main__':

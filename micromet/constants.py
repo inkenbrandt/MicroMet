@@ -15,7 +15,6 @@ Included constants:
 * **Lv0** : latent heat of vaporization for water at 0C
 * **k** :  von Kármán constant
 """
-from numpy import pi
 
 g0 = 9.80665  # standard gravitational acceleration (m/s)
 stefan = 5.67e-8  # Stefan-boltzmann constant (W/m^2/K^4)
