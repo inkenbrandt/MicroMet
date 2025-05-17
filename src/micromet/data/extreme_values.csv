@@ -1,0 +1,142 @@
+Name,Description,Units,Min,Max
+COND_WATER,"Conductivity (i.e., electrical conductivity) of water",µS cm-1,0,10000
+DO,Dissolved oxygen in water,µmol L-1,0,456
+PCH4,Dissolved methane (CH4) in water,nmolCH4 mol-1,0,1500
+PCO2,Dissolved carbon dioxide (CO2) in water,µmolCO2 mol-1,0,10000
+PN2O,Dissolved nitrous oxide (N2O) in water,nmolN2O mol-1,0,10000
+PPFD_UW_IN,"Photosynthetic photon flux density, underwater, incoming",µmolPhotons m-2 s-1,0,2400
+TW,Water temperature,deg C,-20,50
+DBH,Diameter of tree measured at breast height (1.3m) with continuous dendrometers,cm,0,500
+LEAF_WET,"Leaf wetness, range 0-100",%,0,100
+SAP_DT,Difference of probes temperature for sapflow measurements,deg C,-10,10
+SAP_FLOW,Sap flow,mmolH2O m-2 s-1,0,100
+T_BOLE,Bole temperature,deg C,-50,70
+T_CANOPY,Temperature of the canopy and/or surface underneath the sensor,deg C,-50,70
+FETCH_70,Distance at which cross-wind integrated footprint cumulative probability is 70%,m,0,10000
+FETCH_80,Distance at which cross-wind integrated footprint cumulative probability is 80%,m,0,12000
+FETCH_90,Distance at which cross-wind integrated footprint cumulative probability is 90%,m,0,15000
+FETCH_FILTER,"Footprint quality flag (i.e., 0, 1): 0 and 1 indicate data measured when wind coming from direction that should be discarded and kept, respectively",nondimensional,0,1
+FETCH_MAX,Distance at which footprint contribution is maximum,m,0,5000
+CH4,Methane (CH4) mole fraction in wet air,nmolCH4 mol-1,0,15000
+CH4_MIXING_RATIO,Methane (CH4) in mole fraction of dry air,nmolCH4 mol-1,0,15000
+CO,Carbon Monoxide (CO) mole fraction in wet air,nmolCO mol-1,0,15000
+CO2,Carbon Dioxide (CO2) mole fraction in wet air,µmolCO2 mol-1,150,1200
+CO2_MIXING_RATIO,Carbon Dioxide (CO2) in mole fraction of dry air,µmolCO2 mol-1,150,1200
+CO2_SIGMA,Standard deviation of carbon dioxide mole fraction in wet air,µmolCO2 mol-1,0,150
+CO2C13,"Stable isotopic composition of CO2 - C13 (i.e., d13C of CO2)",‰ (permil),-50,-6
+FC,Carbon Dioxide (CO2) turbulent flux (no storage correction),µmolCO2 m-2 s-1,-100,100
+FCH4,Methane (CH4) turbulent flux (no storage correction),nmolCH4 m-2 s-1,-500,4000
+FN2O,Nitrous oxide (N2O) turbulent flux (no storage correction),nmolN2O m-2 s-1,-500,4000
+FNO,Nitric oxide (NO) turbulent flux (no storage correction),nmolNO m-2 s-1,-500,4000
+FNO2,Nitrogen dioxide (NO2) turbulent flux (no storage correction),nmolNO2 m-2 s-1,-500,4000
+FO3,Ozone (O3) turbulent flux (no storage correction),nmolO3 m-2 s-1,-500,4000
+H2O,Water (H2O) vapor in mole fraction of wet air,mmolH2O mol-1,0,100
+H2O_MIXING_RATIO,Water (H2O) vapor in mole fraction of dry air,mmolH2O mol-1,0,100
+H2O_SIGMA,Standard deviation of water vapor mole fraction,mmolH2O mol-1,0,15
+N2O,Nitrous Oxide (N2O) mole fraction in wet air,nmolN2O mol-1,0,4000
+N2O_MIXING_RATIO,Nitrous Oxide (N2O) in mole fraction of dry air,nmolN2O mol-1,0,4000
+NO,Nitric oxide (NO) mole fraction in wet air,nmolNO mol-1,0,4000
+NO2,Nitrogen dioxide (NO2) mole fraction in wet air,nmolNO2 mol-1,0,4000
+O3,Ozone (O3) mole fraction in wet air,nmolO3 mol-1,0,4000
+SC,Carbon Dioxide (CO2) storage flux,µmolCO2 m-2 s-1,-100,100
+SCH4,Methane (CH4) storage flux,nmolCH4 m-2 s-1,-100,100
+SN2O,Nitrous oxide (N2O) storage flux,nmolN2O m-2 s-1,-100,100
+SNO,Nitric oxide (NO) storage flux,nmolNO m-2 s-1,-100,100
+SNO2,Nitrogen dioxide (NO2) storage flux,nmolNO2 m-2 s-1,-100,100
+SO2,Sulfur Dioxide (SO2) mole fraction in wet air,nmolSO2 mol-1,0,3000
+SO3,Ozone (O3) storage flux,nmolO3 m-2 s-1,0,3000
+FH2O,Water vapor (H2O) turbulent flux (no storage correction),mmolH2O m-2 s-1,-10,20
+G,Soil heat flux,W m-2,-250,400
+H,Sensible heat turbulent flux (no storage correction),W m-2,-450,900
+LE,Latent heat turbulent flux (no storage correction),W m-2,-450,900
+SB,Heat storage flux in biomass,W m-2,-1000,3000
+SG,Heat storage flux in the soil above the soil heat fluxes measurement,W m-2,-100,250
+SH,Sensible heat (H) storage flux,W m-2,-150,150
+SLE,Latent heat (LE) storage flux,W m-2,-150,150
+PA,Atmospheric pressure,kPa,60,105
+PBLH,Planetary boundary layer height,m,0,3000
+RH,"Relative humidity, range 0-100",%,0,100
+T_SONIC,Sonic temperature,deg C,-50,50
+T_SONIC_SIGMA,Standard deviation of sonic temperature,deg C,0,5
+TA,Air temperature,deg C,-50,50
+VPD,Vapor Pressure Deficit,hPa,0,80
+D_SNOW,Snow depth,cm,0,500
+P,Precipitation,mm,0,50
+P_RAIN,Rainfall,mm,0,50
+P_SNOW,Snowfall,mm,0,50
+RUNOFF,Run off,mm,0,200
+STEMFLOW,Excess precipitation that drains from outlying branches and leaves and is channeled through the stems to the ground,mm,0,200
+THROUGHFALL,Excess precipitation that passes directly through a canopy or drips from wet leaves to the ground,mm,0,20
+ALB,"Albedo, range 0-100",%,0,100
+APAR,Absorbed PAR,µmolPhoton m-2 s-1,0,2300
+EVI,Enhanced Vegetation Index,nondimensional,-1,1
+FAPAR,"Fraction of absorbed PAR, range 0-100",%,0,100
+FIPAR,"Fraction of intercepted PAR, range 0-100",%,0,100
+LW_BC_IN,"Longwave radiation, below canopy incoming",W m-2,50,600
+LW_BC_OUT,"Longwave radiation, below canopy outgoing",W m-2,100,750
+LW_IN,"Longwave radiation, incoming",W m-2,50,600
+LW_OUT,"Longwave radiation, outgoing",W m-2,100,750
+MCRI,"Carotenoid Reflectance Index (Gitelson et al., 2002)",nondimensional,0,10
+MTCI,"Meris Terrestrial Chlorophyll Index (Dash and Curran, 2004)",nondimensional,0,10
+NDVI,Normalized Difference Vegetation Index,nondimensional,-1,1
+NETRAD,Net radiation,W m-2,-200,1100
+NIRV,"Near Infrared Vegetation Index (Badgley et al., 2017)",W m-2 sr-1 nm-1,0,2
+PPFD_BC_IN,"Photosynthetic photon flux density, below canopy incoming",µmolPhoton m-2 s-1,0,2400
+PPFD_BC_OUT,"Photosynthetic photon flux density, below canopy outgoing",µmolPhoton m-2 s-1,0,2000
+PPFD_DIF,"Photosynthetic photon flux density, diffuse incoming",µmolPhoton m-2 s-1,0,1400
+PPFD_DIR,"Photosynthetic photon flux density, direct incoming",µmolPhoton m-2 s-1,0,2400
+PPFD_IN,"Photosynthetic photon flux density, incoming",µmolPhoton m-2 s-1,0,2400
+PPFD_OUT,"Photosynthetic photon flux density, outgoing",µmolPhoton m-2 s-1,0,2000
+PRI,Photochemical Reflectance Index,nondimensional,-1,1
+R_UVA,"UVA radiation, incoming",W m-2,0,85
+R_UVB,"UVB radiation, incoming",W m-2,0,20
+REDCI,Red Edge Chlorophyll Index,nondimensional,0,10
+REP,"Red Edge Position (Dash and Curran, 2004)",nm,400,800
+SPEC_NIR_IN,"Radiation (near infra-red band), incoming (hemispherical)",W m-2 nm-1,0,2
+SPEC_NIR_OUT,"Radiation (near infra-red band), outgoing",W m-2 sr-1 nm-1,0,2
+SPEC_NIR_REFL,Reflectance (near infra-red band),nondimensional,0,1
+SPEC_PRI_REF_IN,"Radiation for PRI reference band (e.g., 570 nm), incoming (hemispherical)",W m-2 nm-1,0,2
+SPEC_PRI_REF_OUT,"Radiation for PRI reference band (e.g., 570 nm), outgoing",W m-2 sr-1 nm-1,0,2
+SPEC_PRI_REF_REFL,"Reflectance for PRI reference band (e.g., 570 nm)",nondimensional,0,1
+SPEC_PRI_TGT_IN,"Radiation for PRI target band (e.g., 531 nm), incoming (hemispherical)",W m-2 nm-1,0,2
+SPEC_PRI_TGT_OUT,"Radiation for PRI target band (e.g., 531 nm), outgoing",W m-2 sr-1 nm-1,0,2
+SPEC_PRI_TGT_REFL,"Reflectance for PRI target band (e.g., 531 nm)",nondimensional,0,1
+SPEC_RED_IN,"Radiation (red band), incoming (hemispherical)",W m-2 nm-1,0,2
+SPEC_RED_OUT,"Radiation (red band), outgoing",W m-2 sr-1 nm-1,0,2
+SPEC_RED_REFL,Reflectance (red band),nondimensional,0,1
+SR,Simple Ratio,nondimensional,0,10
+SW_BC_IN,"Shortwave radiation, below canopy incoming",W m-2,0,1300
+SW_BC_OUT,"Shortwave radiation, below canopy outgoing",W m-2,0,800
+SW_DIF,"Shortwave radiation, diffuse incoming",W m-2,0,750
+SW_DIR,"Shortwave radiation, direct incoming",W m-2,0,1300
+SW_IN,"Shortwave radiation, incoming",W m-2,0,1300
+SW_OUT,"Shortwave radiation, outgoing",W m-2,0,800
+TCARI,Transformed Chlorophyll Absorption in Reflectance Index,nondimensional,0,10
+SWC,"Soil water content (volumetric), range 0-100",%,0,100
+SWP,Soil water potential,kPa,-750,0
+TS,Soil temperature,deg C,-40,65
+TSN,Snow temperature,deg C,-40,4
+WTD,Water table depth,m,-10,10
+MO_LENGTH,Monin-Obukhov length,m,-100000,1000000
+TAU,Momentum flux,kg m-1 s-2,-10,2
+U_SIGMA,Standard deviation of velocity fluctuations (towards main-wind direction after coordinates rotation),m s-1,0,12
+USTAR,Friction velocity,m s-1,0,8
+V_SIGMA,Standard deviation of lateral velocity fluctuations (cross main-wind direction after coordinates rotation),m s-1,0,10
+W_SIGMA,Standard deviation of vertical velocity fluctuations,m s-1,0,5
+WD,Wind direction,Decimal degrees,0,360
+WD_SIGMA,"Standard deviation of wind direction (Yamartino, 1984)",decimal degree,0,180
+WS,Wind speed,m s-1,0,40
+WS_MAX,maximum WS in the averaging period,m s-1,0,50
+ZL,Monin-Obukhov Stability parameter,nondimensional,-100000,1000000
+GPP,Gross Primary Productivity,µmolCO2 m-2 s-1,-30,100
+NEE,Net Ecosystem Exchange,µmolCO2 m-2 s-1,-100,100
+RECO,Ecosystem Respiration,µmolCO2 m-2 s-1,-20,50
+FC_SSITC_TEST,"Results of the quality flagging for FC according to Foken et al 2004, based on a combination of Steady State and Integral Turbulence Characteristics tests by Foken and Wichura (1996) (i.e., 0, 1, 2)",nondimensional,0,10
+FCH4_SSITC_TEST,"Results of the quality flagging for FCH4 according to Foken et al 2004, based on a combination of Steady State and Integral Turbulence Characteristics tests by Foken and Wichura (1996) (i.e., 0, 1, 2)",nondimensional,0,10
+FN2O_SSITC_TEST,"Results of the quality flagging for FN2O according to Foken et al 2004, based on a combination of Steady State and Integral Turbulence Characteristics tests by Foken and Wichura (1996) (i.e., 0, 1, 2)",nondimensional,0,10
+FNO_SSITC_TEST,"Results of the quality flagging for FNO according to Foken et al 2004, based on a combination of Steady State and Integral Turbulence Characteristics tests by Foken and Wichura (1996) (i.e., 0, 1, 2)",nondimensional,0,10
+FNO2_SSITC_TEST,"Results of the quality flagging for FNO2 according to Foken et al 2004, based on a combination of Steady State and Integral Turbulence Characteristics tests by Foken and Wichura (1996) (i.e., 0, 1, 2)",nondimensional,0,10
+FO3_SSITC_TEST,"Results of the quality flagging for FO3 according to Foken et al 2004, based on a combination of Steady State and Integral Turbulence Characteristics tests by Foken and Wichura (1996) (i.e., 0, 1, 2)",nondimensional,0,10
+H_SSITC_TEST,"Results of the quality flagging for H according to Foken et al 2004, based on a combination of Steady State and Integral Turbulence Characteristics tests by Foken and Wichura (1996) (i.e., 0, 1, 2)",nondimensional,0,10
+LE_SSITC_TEST,"Results of the quality flagging for LE according to Foken et al 2004, based on a combination of Steady State and Integral Turbulence Characteristics tests by Foken and Wichura (1996) (i.e., 0, 1, 2)",nondimensional,0,10
+TAU_SSITC_TEST,"Results of the quality flagging for TAU according to Foken et al 2004, based on a combination of Steady State and Integral Turbulence Characteristics tests by Foken and Wichura (1996) (i.e., 0, 1, 2)",nondimensional,0,10

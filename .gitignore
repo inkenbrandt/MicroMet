@@ -63,3 +63,5 @@ station_config/output/US-UTW_monthly_data.csv
 /dist
 /recipes/meta.yaml
 /MicroMet
+/out_data/station_config
+/out_data/station_data

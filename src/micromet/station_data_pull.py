@@ -42,7 +42,7 @@ class StationDataManager:
             config["LOGGER"]["login"], config["LOGGER"]["pw"]
         )
 
-    def _get_port(self, station: str, loggertype: str) -> int:
+    def _get_port(self, station: str, loggertype: str = "eddy") -> int:
         """
         Get the port number for a given station and logger type.
 
@@ -71,7 +71,6 @@ class StationDataManager:
         """
         ip = self.config[station]["ip"]
         port = self._get_port(station, loggertype)
-
         clk_url = f"http://{ip}:{port}/?"
         clk_args = {
             "command": "ClockCheck",
@@ -94,7 +93,13 @@ class StationDataManager:
         return stationid.split("-")[-1]
 
     def get_station_data(
-        self, station: str, reformat: bool = True, loggertype: str = "eddy"
+        self,
+        station: str,
+        reformat: bool = True,
+        loggertype: str = "eddy",
+        config_path: str = "data/reformatter_vars.yml",
+        var_limits_csv: str = "data/extreme_values.csv",
+        drop_soil: bool = False,
     ) -> Tuple[Optional[pd.DataFrame], Optional[float]]:
         """
         Fetch and process station data.
@@ -129,6 +134,12 @@ class StationDataManager:
             pack_size = len(response.content) * 1e-6
 
             if raw_data is not None and reformat:
+                am_data = Reformatter(
+                    config_path=config_path,
+                    var_limits_csv=var_limits_csv,
+                    drop_soil=drop_soil,
+                )
+                am_df = am_data.prepare(raw_data)
                 am_data = Reformatter(raw_data)
                 am_df = am_data.et_data
             else:
