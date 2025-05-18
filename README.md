@@ -1,4 +1,8 @@
 # MicroMet
+
+![Read the Docs](https://img.shields.io/readthedocs/micromet)
+![Conda Version](https://img.shields.io/conda/v/conda-forge/micromet)
+
 # Description
 
 Scripts to process half-hourly Eddy Covariance data from [Campbell Scientific CR6 dataloggers](https://www.campbellsci.com/cr6) running [EasyFluxDL](https://www.campbellsci.com/easyflux-dl) for submission to the Ameriflux Data Portal.
