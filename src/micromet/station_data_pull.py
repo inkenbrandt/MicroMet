@@ -9,15 +9,6 @@ import configparser
 import sqlalchemy
 from .converter import Reformatter
 
-try:
-    config = configparser.ConfigParser()
-    config.read("../secrets/config.ini")
-    passwrd = config["DEFAULT"]["pw"]
-    ip = config["DEFAULT"]["ip"]
-    login = config["DEFAULT"]["login"]
-except KeyError:
-    print("credentials needed")
-
 
 class StationDataManager:
     """
@@ -97,8 +88,8 @@ class StationDataManager:
         station: str,
         reformat: bool = True,
         loggertype: str = "eddy",
-        config_path: str = "data/reformatter_vars.yml",
-        var_limits_csv: str = "data/extreme_values.csv",
+        config_path: str = "./data/reformatter_vars.yml",
+        var_limits_csv: str = "./data/extreme_values.csv",
         drop_soil: bool = False,
     ) -> Tuple[Optional[pd.DataFrame], Optional[float]]:
         """
@@ -108,6 +99,9 @@ class StationDataManager:
             station: Station identifier
             reformat: Whether to reformat the data
             loggertype: Logger type ('eddy' or 'met')
+            config_path: Path to reformatter configuration
+            var_limits_csv: Path to extreme values CSV
+            drop_soil: Whether to drop soil data
 
         Returns:
             Tuple of processed DataFrame and data packet size
