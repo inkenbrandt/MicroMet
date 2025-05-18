@@ -134,8 +134,8 @@ class StationDataManager:
                     drop_soil=drop_soil,
                 )
                 am_df = am_data.prepare(raw_data)
-                am_data = Reformatter(raw_data)
-                am_df = am_data.et_data
+                # am_data = Reformatter(raw_data)
+                # am_df = am_data.et_data
             else:
                 am_df = raw_data
 
@@ -231,7 +231,12 @@ class StationDataManager:
         df = pd.read_sql(query, con=self.engine)
         return df.columns.tolist()
 
-    def process_station_data(self, site_folders: dict) -> None:
+    def process_station_data(
+        self,
+        site_folders: dict,
+        config_path: str = "./data/reformatter_vars.yml",
+        var_limits_csv: str = "./data/extreme_values.csv",
+    ) -> None:
         """
         Process data for all stations.
 
@@ -247,7 +252,12 @@ class StationDataManager:
 
                 try:
                     stationtime, comptime = self.get_times(station, loggertype=dat)
-                    am_df, pack_size = self.get_station_data(station, loggertype=dat)
+                    am_df, pack_size = self.get_station_data(
+                        station,
+                        loggertype=dat,
+                        config_path=config_path,
+                        var_limits_csv=var_limits_csv,
+                    )
                 except Exception as e:
                     print(f"Error fetching data for {stationid}: {e}")
                     continue
