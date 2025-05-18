@@ -2,6 +2,7 @@
 
 ![Read the Docs](https://img.shields.io/readthedocs/micromet)
 ![Conda Version](https://img.shields.io/conda/v/conda-forge/micromet)
+![PyPI - Version](https://img.shields.io/pypi/v/micromet)
 
 # Description
 
