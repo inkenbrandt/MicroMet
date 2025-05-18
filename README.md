@@ -3,6 +3,7 @@
 ![Read the Docs](https://img.shields.io/readthedocs/micromet)
 ![Conda Version](https://img.shields.io/conda/v/conda-forge/micromet)
 ![PyPI - Version](https://img.shields.io/pypi/v/micromet)
+![Anaconda-Server Badge](https://anaconda.org/conda-forge/micromet/badges/downloads.svg)](https://anaconda.org/conda-forge/micromet)
 
 # Description
 
