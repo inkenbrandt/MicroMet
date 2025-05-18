@@ -4,7 +4,14 @@
 ![Conda Version](https://img.shields.io/conda/v/conda-forge/micromet)
 ![PyPI - Version](https://img.shields.io/pypi/v/micromet)
 [![Anaconda-Server Badge](https://anaconda.org/conda-forge/micromet/badges/downloads.svg)](https://anaconda.org/conda-forge/micromet)
-
+<table><tr><td>All platforms:</td>
+    <td>
+      <a href="https://dev.azure.com/conda-forge/feedstock-builds/_build/latest?definitionId=25590&branchName=main">
+        <img src="https://dev.azure.com/conda-forge/feedstock-builds/_apis/build/status/micromet-feedstock?branchName=main">
+      </a>
+    </td>
+  </tr>
+</table>
 # Description
 
 Scripts to process half-hourly Eddy Covariance data from [Campbell Scientific CR6 dataloggers](https://www.campbellsci.com/cr6) running [EasyFluxDL](https://www.campbellsci.com/easyflux-dl) for submission to the Ameriflux Data Portal.
