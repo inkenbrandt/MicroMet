@@ -10,7 +10,7 @@ import sqlalchemy
 from .converter import Reformatter
 
 
-class StationDataManager:
+class StationDataDownloader:
     """
     A class to manage station data operations including fetching, processing, and database interactions.
     """
@@ -18,7 +18,6 @@ class StationDataManager:
     def __init__(
         self,
         config: Union[configparser.ConfigParser, dict],
-        engine: sqlalchemy.engine.base.Engine,
     ):
         """
         Initialize the StationDataManager with configuration and database engine.
@@ -28,7 +27,7 @@ class StationDataManager:
             engine: SQLAlchemy database engine
         """
         self.config = config
-        self.engine = engine
+
         self.logger_credentials = HTTPBasicAuth(
             config["LOGGER"]["login"], config["LOGGER"]["pw"]
         )
@@ -53,12 +52,21 @@ class StationDataManager:
         """
         Retrieve current logger time and system time.
 
-        Args:
-            station: Station identifier
-            loggertype: Logger type ('eddy' or 'met')
+        Parameters
+        ----------
+        station : str
+            Station identifier
+        loggertype : str, optional
+            Type of logger ('eddy' or 'met'), by default 'eddy'
 
-        Returns:
-            Tuple of logger time and system time
+        Returns
+        -------
+        Tuple[Optional[str], str]
+            Tuple containing current logger time and system time
+
+        Notes
+        -----
+        See https://help.campbellsci.com/crbasic/cr6/Content/Info/webserverapicommands1.htm
         """
         ip = self.config[station]["ip"]
         port = self._get_port(station, loggertype)
@@ -83,6 +91,90 @@ class StationDataManager:
         """Extract station ID from full station identifier."""
         return stationid.split("-")[-1]
 
+    def download_from_station(
+        self,
+        station: str,
+        loggertype: str = "eddy",
+        mode: str = "since-time",
+        p1: str = "0",
+        p2: str = "0",
+    ):
+        """
+        Download data from a station.
+
+        Parameters
+        ----------
+        station : str
+            Station identifier
+        loggertype: str
+            Type of logger ('eddy' or 'met'); default is 'eddy'
+        mode: str
+            Timeframe of the data to be returned ('since-time', 'most-recent', 'since-record', 'date-range', 'Backfill'); default is 'since-time'
+        p1: str
+            String datetime (YYYY-MM-DD T:HH:MM:SS.MS or YYYY-MM-DD) if since-time, or daterange; otherwise # of starting record or backfill interval; default is 0
+        p2: str
+            String datetime (YYYY-MM-DD T:HH:MM:SS.MS or YYYY-MM-DD) if daterange; default is 0
+
+        Returns
+        -------
+        Tuple[Optional[pd.DataFrame], Optional[float]]
+            Tuple containing downloaded data and data packet size
+
+        Notes
+        -----
+        See https://help.campbellsci.com/crbasic/cr6/Content/Info/webserverapicommands1.htm
+        """
+
+        ip = self.config[station]["ip"]
+        port = self._get_port(station, loggertype)
+        tabletype = (
+            "Flux_AmeriFluxFormat" if loggertype == "eddy" else "Statistics_AmeriFlux"
+        )
+
+        url = f"http://{ip}:{port}/tables.html?"
+        params = {
+            "command": "DataQuery",
+            "mode": f"{mode}",
+            "format": "toA5",
+            "uri": f"dl:{tabletype}",
+        }
+
+        if p1 == "0" or p1 == 0:
+            params["p1"] = "0"
+        else:
+            params["p1"] = p1
+
+        if p2 == "0" or p2 == 0:
+            if mode == "since-time":
+                params["p1"] = (
+                    f"{datetime.datetime.now() - datetime.timedelta(days=10):%Y-%m-%d}"
+                )
+
+        else:
+            params["p2"] = p2
+
+        response = requests.get(url, params=params, auth=self.logger_credentials)
+
+        if response.status_code == 200:
+            raw_data = pd.read_csv(BytesIO(response.content), skiprows=[0, 2, 3])
+            pack_size = len(response.content) * 1e-6
+            return raw_data, pack_size, response.status_code
+        else:
+            print(f"Error: {response.status_code}")
+            return None, None, response.status_code
+
+
+class StationDataProcessor(StationDataDownloader):
+    def __init__(
+        self,
+        config: Union[configparser.ConfigParser, dict],
+        engine: sqlalchemy.engine.base.Engine,
+    ):
+
+        super().__init__(config)
+        self.config = config
+        self.engine = engine
+
     def get_station_data(
         self,
         station: str,
@@ -106,27 +198,14 @@ class StationDataManager:
         Returns:
             Tuple of processed DataFrame and data packet size
         """
-        ip = self.config[station]["ip"]
-        port = self._get_port(station, loggertype)
-        tabletype = (
-            "Flux_AmeriFluxFormat" if loggertype == "eddy" else "Statistics_AmeriFlux"
+        last_date = self.get_max_date(station, loggertype)
+        raw_data, pack_size, status_code = self.download_from_station(
+            station,
+            loggertype=loggertype,
+            mode="since-time",
+            p1=f"{last_date:%Y-%m-%d}",
         )
-
-        url = f"http://{ip}:{port}/tables.html?"
-        params = {
-            "command": "DataQuery",
-            "mode": "since-record",
-            "format": "toA5",
-            "uri": f"dl:{tabletype}",
-            "p1": "0",
-        }
-
-        response = requests.get(url, params=params, auth=self.logger_credentials)
-
-        if response.status_code == 200:
-            raw_data = pd.read_csv(BytesIO(response.content), skiprows=[0, 2, 3])
-            pack_size = len(response.content) * 1e-6
-
+        if status_code == 200:
             if raw_data is not None and reformat:
                 am_data = Reformatter(
                     config_path=config_path,
@@ -141,7 +220,7 @@ class StationDataManager:
 
             return am_df, pack_size
 
-        print(f"Error: {response.status_code}")
+        print(f"Error: {status_code}")
         return None, None
 
     @staticmethod
@@ -168,7 +247,10 @@ class StationDataManager:
         for col in column_variations:
             if col in df.columns:
                 print(f"Column '{col}' found in DataFrame")
-                return df[~df[col].isin(values_to_remove)]
+                remaining = df[~df[col].isin(values_to_remove)]
+                print(f"{len(remaining)} records remaining after filtering")
+                print(f"Removing {len(df) - len(remaining)} records")
+                return remaining
 
         raise ValueError(f"Column '{column_to_check}' not found in DataFrame")
 
@@ -203,11 +285,16 @@ class StationDataManager:
         """
         Get maximum timestamp from station database.
 
-        Args:
-            station: Station identifier
-            loggertype: Logger type
+        Parameters
+        ----------
+        station : str
+            Station identifier
+        loggertype : str, optional
+            Type of logger ('eddy' or 'met'), by default 'eddy'
 
-        Returns:
+        Returns
+        -------
+        int
             Latest timestamp
         """
         table = f"amflux{loggertype}"
@@ -269,6 +356,7 @@ class StationDataManager:
                 am_cols = self.database_columns(dat)
 
                 am_df_filt = self.compare_sql_to_station(am_df, station, loggertype=dat)
+                print(f"Filtered {len(am_df_filt)} records")
                 stats = self._prepare_upload_stats(
                     am_df_filt,
                     stationid,
