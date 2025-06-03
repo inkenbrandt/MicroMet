@@ -3,9 +3,38 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy
+import logging
 
 
-def energy_sankey(df, date_text="2024-06-19 12:00"):
+def logger_check(logger: logging.Logger | None) -> logging.Logger:
+    """
+    Check if a logger is provided, and if not, create one.
+
+    Args:
+        logger: Logger to check
+
+    Returns:
+        Logger to use
+    """
+    if logger is None:
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.WARNING)
+
+        # Create console handler and set level
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.WARNING)
+
+        # Create formatter
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        ch.setFormatter(formatter)
+
+        # Add handler to logger
+        logger.addHandler(ch)
+
+    return logger
+
+
+def energy_sankey(df, date_text="2024-06-19 12:00", logger: logging.Logger = None):
     """
     Create a Sankey diagram representing the energy balance for a specific date and time.
 
@@ -77,7 +106,8 @@ def energy_sankey(df, date_text="2024-06-19 12:00"):
         "Residual",
     ]
 
-    print(h)
+    logger = logger_check(logger)
+    logger.debug(f"Sensible Heat: {h}")
     rem = nr - (shf + h + le)
 
     ebr = (h + le) / (nr - shf)
@@ -120,7 +150,7 @@ def energy_sankey(df, date_text="2024-06-19 12:00"):
     return fig
 
 
-def scatterplot_instrument_comparison(edmet, compare_dict, station):
+def scatterplot_instrument_comparison(edmet, compare_dict, station, logger: logging.Logger = None):
     """
     Generate a scatterplot comparing two instrument measurements with regression analysis.
 
@@ -203,10 +233,11 @@ def scatterplot_instrument_comparison(edmet, compare_dict, station):
 
     plt.show()
 
-    # Print results
-    print(f"Slope: {slope:.3f}")
-    print(f"Intercept: {intercept:.3f}")
-    print(f"R-squared: {r_squared:.3f}")
+    # Log results
+    logger = logger_check(logger)
+    logger.info(f"Slope: {slope:.3f}")
+    logger.info(f"Intercept: {intercept:.3f}")
+    logger.info(f"R-squared: {r_squared:.3f}")
     return slope, intercept, r_squared, p_value, std_err, fig, ax
 
 
@@ -391,7 +422,7 @@ def mean_diff_plot(
     return fig
 
 
-def bland_alt_plot(edmet, compare_dict, station, alpha=0.5):
+def bland_alt_plot(edmet, compare_dict, station, alpha=0.5, logger: logging.Logger = None):
     """
     Create a Bland–Altman plot to assess agreement between two instruments.
 
@@ -436,13 +467,14 @@ def bland_alt_plot(edmet, compare_dict, station, alpha=0.5):
     x = df[instruments[0]]
     y = df[instruments[1]]
     rmse = np.sqrt(mean_squared_error(x, y))
-    print(f"RMSE: {rmse:.3f}")
+    logger = logger_check(logger)
+    logger.info(f"RMSE: {rmse:.3f}")
 
     mean_vals = df[instruments].mean(axis=1)
     diff_vals = x - y
     bias = diff_vals.mean()
     spread = diff_vals.std()
-    print(f"Bias = {bias:.3f}, Spread = {spread:.3f}")
+    logger.info(f"Bias = {bias:.3f}, Spread = {spread:.3f}")
     top = diff_vals.mean() + 1.96 * diff_vals.std()
     bottom = diff_vals.mean() - 1.96 * diff_vals.std()
 

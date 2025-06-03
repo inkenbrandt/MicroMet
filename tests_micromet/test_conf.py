@@ -161,4 +161,18 @@ def test_polar_to_cartesian_dataframe():
     assert np.isclose(out.loc[0, "Y_Dist"], 1, atol=1e-7)
 
 
+def test_filter_near_neutral():
+    """Test the filter_near_neutral function with various inputs."""
+    # Test with default bounds (-0.1 < z/L < 0)
+    z_over_L = np.array([-0.2, -0.05, 0.05, 0.2])
+    mask = tools.filter_near_neutral(z_over_L)
+    assert np.array_equal(mask, np.array([False, True, False, False]))
 
+    # Test with custom bounds (-0.2 < z/L < 0.1)
+    mask = tools.filter_near_neutral(z_over_L, lower=-0.2, upper=0.1)
+    assert np.array_equal(mask, np.array([True, True, True, False]))
+
+    # Test with list input
+    z_over_L_list = [-0.2, -0.05, 0.05, 0.2]
+    mask = tools.filter_near_neutral(z_over_L_list)
+    assert np.array_equal(mask, np.array([False, True, False, False]))

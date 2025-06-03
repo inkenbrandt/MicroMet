@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Sequence, Tuple, Union
 import pandas as pd
 import numpy as np
 import yaml
-
+from importlib.resources import files
 
 # -----------------------------------------------------------------------------#
 # Helper functions
@@ -84,9 +84,12 @@ class AmerifluxDataProcessor:
         config_path: Path | str = "reformatter_vars.yml",
         logger: logging.Logger = None,
     ):
-
+        if config_path == "reformatter_vars.yml":
+            data_path = files('micromet.data').joinpath('reformatter_vars.yml')
+        else:
+            data_path = Path(config_path)
         self.logger = logger_check(logger)
-        self.headers = load_yaml(Path(config_path))
+        self.headers = load_yaml(data_path)
         self.skip_rows = None
 
     # --------------------------------------------------------------------- #
@@ -122,6 +125,7 @@ class AmerifluxDataProcessor:
             self.skip_rows = 0
             self.names = first_line
         elif first_line[0] == self._TOA5_PREFIX:
+            self.logger.debug(f"TOA5 header detected: {first_line}")
             self.skip_rows = [0, 1, 2, 3]
             self.names = second_line
         else:
@@ -259,16 +263,25 @@ class Reformatter:
 
     def __init__(
         self,
-        config_path: str | Path,
+        config_path: str | Path = "reformatter_vars.yml",
         var_limits_csv: str | Path | None = None,
         drop_soil: bool = True,
         logger: logging.Logger = None,
     ):
         self.logger = logger_check(logger)
-        self.config = load_yaml(config_path)
-        self.varlimits = (
-            pd.read_csv(var_limits_csv).set_index("Name") if var_limits_csv else None
-        )
+
+        if config_path == "reformatter_vars.yml":
+            data_path = files('micromet.data').joinpath('reformatter_vars.yml')
+        else:
+            data_path = Path(config_path)
+
+        self.config = load_yaml(data_path)
+
+        # set source of variable limits
+        var_lim_path = (var_limits_csv if var_limits_csv else files("micromet.data").joinpath("var_limits.csv"))
+        self.varlimits = pd.read_csv(var_lim_path).set_index("Name")
+
+
         self.drop_soil = drop_soil
 
     # ------------------------------------------------------------------
@@ -415,6 +428,7 @@ class Reformatter:
         mapping = self.config.get(
             "renames_eddy" if data_type == "eddy" else "renames_met", {}
         )
+        self.logger.debug(f"Renaming columns from {df.columns} to {mapping}")
         df = df.rename(columns=mapping)
         df = self.normalize_prefixes(df)
         df = self.modernize_soil_legacy(df)
@@ -842,7 +856,10 @@ class Reformatter:
         - All other columns are converted to numeric (float) with `errors='coerce'`.
         - Logging reports the number of rows processed.
         """
+        self.logger.debug(f"Setting number types: {df.head(3)}")
         for col in df.columns:
+            self.logger.debug(f"Setting number types {col}")
+
             if col in ["MO_LENGTH", "RECORD"]:
                 df[col] = pd.to_numeric(df[col], downcast="integer", errors="coerce")
 

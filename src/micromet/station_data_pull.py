@@ -1,5 +1,6 @@
 import requests
 import datetime
+import logging
 from typing import Union, Tuple, Optional
 
 from requests.auth import HTTPBasicAuth
@@ -10,6 +11,34 @@ import sqlalchemy
 from .converter import Reformatter
 
 
+def logger_check(logger: logging.Logger | None) -> logging.Logger:
+    """
+    Check if a logger is provided, and if not, create one.
+
+    Args:
+        logger: Logger to check
+
+    Returns:
+        Logger to use
+    """
+    if logger is None:
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.WARNING)
+
+        # Create console handler and set level
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.WARNING)
+
+        # Create formatter
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        ch.setFormatter(formatter)
+
+        # Add handler to logger
+        logger.addHandler(ch)
+
+    return logger
+
+
 class StationDataDownloader:
     """
     A class to manage station data operations including fetching, processing, and database interactions.
@@ -18,15 +47,17 @@ class StationDataDownloader:
     def __init__(
         self,
         config: Union[configparser.ConfigParser, dict],
+        logger: logging.Logger = None,
     ):
         """
         Initialize the StationDataManager with configuration and database engine.
 
         Args:
             config: Configuration containing station details and credentials
-            engine: SQLAlchemy database engine
+            logger: Logger to use for logging messages
         """
         self.config = config
+        self.logger = logger_check(logger)
 
         self.logger_credentials = HTTPBasicAuth(
             config["LOGGER"]["login"], config["LOGGER"]["pw"]
@@ -160,7 +191,7 @@ class StationDataDownloader:
             pack_size = len(response.content) * 1e-6
             return raw_data, pack_size, response.status_code
         else:
-            print(f"Error: {response.status_code}")
+            self.logger.error(f"Error downloading from station: {response.status_code}")
             return None, None, response.status_code
 
 
@@ -169,11 +200,13 @@ class StationDataProcessor(StationDataDownloader):
         self,
         config: Union[configparser.ConfigParser, dict],
         engine: sqlalchemy.engine.base.Engine,
+        logger: logging.Logger = None,
     ):
 
-        super().__init__(config)
+        super().__init__(config, logger)
         self.config = config
         self.engine = engine
+        self.logger = logger_check(logger)
 
     def get_station_data(
         self,
@@ -220,12 +253,12 @@ class StationDataProcessor(StationDataDownloader):
 
             return am_df, pack_size
 
-        print(f"Error: {status_code}")
+        self.logger.error(f"Error fetching station data: {status_code}")
         return None, None
 
     @staticmethod
     def remove_existing_records(
-        df: pd.DataFrame, column_to_check: str, values_to_remove: list
+        df: pd.DataFrame, column_to_check: str, values_to_remove: list, logger: logging.Logger = None
     ) -> pd.DataFrame:
         """
         Remove existing records from DataFrame.
@@ -234,10 +267,12 @@ class StationDataProcessor(StationDataDownloader):
             df: Input DataFrame
             column_to_check: Column name to check
             values_to_remove: Values to remove
+            logger: Logger to use for logging messages
 
         Returns:
             Filtered DataFrame
         """
+        logger = logger_check(logger)
         column_variations = [
             column_to_check,
             column_to_check.upper(),
@@ -246,10 +281,10 @@ class StationDataProcessor(StationDataDownloader):
 
         for col in column_variations:
             if col in df.columns:
-                print(f"Column '{col}' found in DataFrame")
+                logger.info(f"Column '{col}' found in DataFrame")
                 remaining = df[~df[col].isin(values_to_remove)]
-                print(f"{len(remaining)} records remaining after filtering")
-                print(f"Removing {len(df) - len(remaining)} records")
+                logger.info(f"{len(remaining)} records remaining after filtering")
+                logger.info(f"Removing {len(df) - len(remaining)} records")
                 return remaining
 
         raise ValueError(f"Column '{column_to_check}' not found in DataFrame")
@@ -279,7 +314,7 @@ class StationDataProcessor(StationDataDownloader):
         exist = pd.read_sql(query, con=self.engine)
         existing = exist["timestamp_end"].values
 
-        return self.remove_existing_records(df, field, existing)
+        return self.remove_existing_records(df, field, existing, self.logger)
 
     def get_max_date(self, station: str, loggertype: str = "eddy") -> datetime.datetime:
         """
@@ -332,7 +367,7 @@ class StationDataProcessor(StationDataDownloader):
         """
         for stationid, name in site_folders.items():
             station = self.get_station_id(stationid)
-            print(stationid)
+            self.logger.info(f"Processing station: {stationid}")
             for dat in ["eddy", "met"]:
                 if dat not in self.config[station]:
                     continue
@@ -346,17 +381,17 @@ class StationDataProcessor(StationDataDownloader):
                         var_limits_csv=var_limits_csv,
                     )
                 except Exception as e:
-                    print(f"Error fetching data for {stationid}: {e}")
+                    self.logger.error(f"Error fetching data for {stationid}: {e}")
                     continue
 
                 if am_df is None:
-                    print(f"No data for {stationid}")
+                    self.logger.warning(f"No data for {stationid}")
                     continue
 
                 am_cols = self.database_columns(dat)
 
                 am_df_filt = self.compare_sql_to_station(am_df, station, loggertype=dat)
-                print(f"Filtered {len(am_df_filt)} records")
+                self.logger.info(f"Filtered {len(am_df_filt)} records")
                 stats = self._prepare_upload_stats(
                     am_df_filt,
                     stationid,
@@ -380,7 +415,7 @@ class StationDataProcessor(StationDataDownloader):
 
                 self._upload_to_database(am_df_filt[upload_cols], stats, dat)
 
-                self._print_processing_summary(station, stats)
+                self._print_processing_summary(station, stats, self.logger)
 
     def _prepare_upload_stats(
         self,
@@ -414,9 +449,10 @@ class StationDataProcessor(StationDataDownloader):
         )
 
     @staticmethod
-    def _print_processing_summary(station: str, stats: dict) -> None:
+    def _print_processing_summary(station: str, stats: dict, logger: logging.Logger = None) -> None:
         """Print processing summary."""
-        print(f"Station {station}")
-        print(f"Mindate {stats['mindate']}  Maxdate {stats['maxdate']}")
-        print(f"data size = {stats['datasize_mb']}")
-        print(f"{stats['uploaddf_len']} vs {stats['stationdf_len']} rows")
+        logger = logger_check(logger)
+        logger.info(f"Station {station}")
+        logger.info(f"Mindate {stats['mindate']}  Maxdate {stats['maxdate']}")
+        logger.info(f"data size = {stats['datasize_mb']}")
+        logger.info(f"{stats['uploaddf_len']} vs {stats['stationdf_len']} rows")

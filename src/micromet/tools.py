@@ -512,6 +512,32 @@ def aggregate_to_daily_centroid(
     return daily_centroids
 
 
+def compute_Cw(sigma_w, u_star, target=1.25):
+    """
+    Compute vertical velocity correction factor C_w so that (C_w*sigma_w)/(sqrt(C_w)*u_star) = target.
+    Uses Eq. (5) from Paw U et al. (2025): Cw = (target/(sigma_w/u_star))^2.
+    If sigma_w/u_star >= target, returns C_w=1 (no correction needed).
+    """
+    ratio = sigma_w / u_star
+    if np.isnan(ratio) or np.isclose(u_star, 0):
+        return np.nan
+    # Only apply correction if measured ratio < target
+    if ratio < target:
+        return (target / ratio) ** 2
+    else:
+        return 1.0
+
+
+def filter_near_neutral(z_over_L, lower=-0.1, upper=0.0):
+    """
+    Return a boolean mask (or filtered array) for near-neutral stability: lower < z/L < upper.
+    Default uses -0.1 < z/L < 0 as in Paw U et al. (2025):contentReference[oaicite:13]{index=13}.
+    """
+    z_over_L = np.asarray(z_over_L, dtype=float)
+    mask = (z_over_L > lower) & (z_over_L < upper)
+    return mask
+
+
 # Example usage:
 if __name__ == "__main__":
     # Create sample data

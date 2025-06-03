@@ -44,7 +44,7 @@ packages = ['micromet']
 include-package-data = true
 
 [tool.setuptools.package-data]
-"micromet.data" = ["*.csv", "*.yml"]
+"micromet" = ["data/*.csv","data/*.yml"]
 
 [project.urls]
 "Homepage" = "https://github.com/inkenbrandt/micromet"

@@ -66,3 +66,5 @@ station_config/output/US-UTW_monthly_data.csv
 /out_data/station_config
 /out_data/station_data
 /footprints
+/.junie/
+/.vscode/
