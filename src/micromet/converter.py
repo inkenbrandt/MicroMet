@@ -27,8 +27,8 @@ import numpy as np
 import yaml
 from importlib.resources import files
 
-import reformatter_vars
-import variable_limits
+import micromet.reformatter_vars as reformatter_vars
+import micromet.variable_limits as variable_limits
 
 # -----------------------------------------------------------------------------#
 # Helper functions
