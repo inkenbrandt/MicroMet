@@ -27,6 +27,9 @@ import numpy as np
 import yaml
 from importlib.resources import files
 
+import reformatter_vars
+import variable_limits
+
 # -----------------------------------------------------------------------------#
 # Helper functions
 # -----------------------------------------------------------------------------#
@@ -84,12 +87,12 @@ class AmerifluxDataProcessor:
         config_path: Path | str = "reformatter_vars.yml",
         logger: logging.Logger = None,
     ):
-        if config_path == "reformatter_vars.yml":
-            data_path = files('micromet.data').joinpath('reformatter_vars.yml')
-        else:
-            data_path = Path(config_path)
+        # if config_path == "reformatter_vars.yml":
+        #    data_path = files("micromet.data").joinpath("reformatter_vars.yml")
+        # else:
+        #    data_path = Path(config_path)
         self.logger = logger_check(logger)
-        self.headers = load_yaml(data_path)
+        # self.headers = load_yaml(data_path)
         self.skip_rows = None
 
     # --------------------------------------------------------------------- #
@@ -263,24 +266,22 @@ class Reformatter:
 
     def __init__(
         self,
-        config_path: str | Path = "reformatter_vars.yml",
         var_limits_csv: str | Path | None = None,
         drop_soil: bool = True,
         logger: logging.Logger = None,
     ):
         self.logger = logger_check(logger)
 
-        if config_path == "reformatter_vars.yml":
-            data_path = files('micromet.data').joinpath('reformatter_vars.yml')
+        self.config = reformatter_vars.config
+        if var_limits_csv is None:
+            self.varlimits = variable_limits.limits
         else:
-            data_path = Path(config_path)
-
-        self.config = load_yaml(data_path)
-
-        # set source of variable limits
-        var_lim_path = (var_limits_csv if var_limits_csv else files("micromet.data").joinpath("var_limits.csv"))
-        self.varlimits = pd.read_csv(var_lim_path).set_index("Name")
-
+            if isinstance(var_limits_csv, str):
+                var_limits_csv = Path(var_limits_csv)
+            self.varlimits = pd.read_csv(
+                var_limits_csv, index_col=0, na_values=["-9999", "NAN", "NaN", "nan"]
+            )
+            self.logger.debug(f"Loaded variable limits from {var_limits_csv}")
 
         self.drop_soil = drop_soil
 
