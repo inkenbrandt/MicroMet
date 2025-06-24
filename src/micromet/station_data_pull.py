@@ -9,6 +9,7 @@ from io import BytesIO
 import configparser
 import sqlalchemy
 from .converter import Reformatter
+from .__init__ import __version__ as micromet_version
 
 
 def logger_check(logger: logging.Logger | None) -> logging.Logger:
@@ -30,7 +31,9 @@ def logger_check(logger: logging.Logger | None) -> logging.Logger:
         ch.setLevel(logging.WARNING)
 
         # Create formatter
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
         ch.setFormatter(formatter)
 
         # Add handler to logger
@@ -258,7 +261,10 @@ class StationDataProcessor(StationDataDownloader):
 
     @staticmethod
     def remove_existing_records(
-        df: pd.DataFrame, column_to_check: str, values_to_remove: list, logger: logging.Logger = None
+        df: pd.DataFrame,
+        column_to_check: str,
+        values_to_remove: list,
+        logger: logging.Logger = None,
     ) -> pd.DataFrame:
         """
         Remove existing records from DataFrame.
@@ -439,6 +445,7 @@ class StationDataProcessor(StationDataDownloader):
             "uploaddf_len": filtered_len,
             "stationtime": stationtime,
             "comptime": comptime,
+            "micromet_version": micromet_version,
         }
 
     def _upload_to_database(self, df: pd.DataFrame, stats: dict, dat: str) -> None:
@@ -449,7 +456,9 @@ class StationDataProcessor(StationDataDownloader):
         )
 
     @staticmethod
-    def _print_processing_summary(station: str, stats: dict, logger: logging.Logger = None) -> None:
+    def _print_processing_summary(
+        station: str, stats: dict, logger: logging.Logger = None
+    ) -> None:
         """Print processing summary."""
         logger = logger_check(logger)
         logger.info(f"Station {station}")

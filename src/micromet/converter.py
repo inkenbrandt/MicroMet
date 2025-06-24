@@ -84,7 +84,6 @@ class AmerifluxDataProcessor:
 
     def __init__(
         self,
-        config_path: Path | str = "reformatter_vars.yml",
         logger: logging.Logger = None,
     ):
         # if config_path == "reformatter_vars.yml":
@@ -93,7 +92,7 @@ class AmerifluxDataProcessor:
         #    data_path = Path(config_path)
         self.logger = logger_check(logger)
         # self.headers = load_yaml(data_path)
-        self.skip_rows = None
+        self.skip_rows = 0
 
     # --------------------------------------------------------------------- #
     # Public API
@@ -125,7 +124,7 @@ class AmerifluxDataProcessor:
             second_line = fp.readline().strip().replace('"', "").split(",")
         if first_line[0] == self._HEADER_PREFIX:
             self.logger.debug(f"Header row detected: {first_line}")
-            self.skip_rows = 0
+            self.skip_rows = 1
             self.names = first_line
         elif first_line[0] == self._TOA5_PREFIX:
             self.logger.debug(f"TOA5 header detected: {first_line}")
@@ -211,13 +210,14 @@ class AmerifluxDataProcessor:
             "US-UTN": "Juab",
             "US-UTG": "Green_River",
         }
+        data = {}
         for stationid, folder in site_folders.items():
             for datatype in ["met", "eddy"]:
                 if datatype == "met":
                     search_str = f"*Statistics_Ameriflux*.dat"
                 else:
                     search_str = f"*AmeriFluxFormat*.dat"
-                self.raw_file_compile(stationid, folder, search_str)
+                data[stationid] = self.raw_file_compile(stationid, folder, search_str)
 
 
 # ----------------------------------------------------------------------------
