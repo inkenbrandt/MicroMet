@@ -9,7 +9,7 @@ from collections import defaultdict
 # ──────────────────────────────────────────────────────────────────────────────
 # 1.  Tiny helpers
 # ──────────────────────────────────────────────────────────────────────────────
-def looks_like_header(line: str) -> bool:
+def looks_like_header(line: str, alpha_thresh: int = 0.5) -> bool:
     """
     Heuristically determine if a line appears to be a header.
 
@@ -32,8 +32,22 @@ def looks_like_header(line: str) -> bool:
     This function assumes comma-separated input and does not generalize to other
     delimiters. It performs a basic check only on the first field.
     """
-    line_list = line.split(",")
-    return bool(re.search(r"[A-Za-z]", line_list[0]))
+    # line_list = line.split(",")
+    # return bool(re.search(r"[A-Za-z]", line_list[0]))
+
+    # ignore empty/whitespace lines
+    if not line.strip():
+        return False
+    sample = line.replace('"', "")  # ignore surrounding quotes
+    tokens = sample.split(",")
+    n_alpha = sum(bool(re.search("[A-Za-z]", t)) for t in tokens[:5])
+    if len(tokens[:5]) and n_alpha / len(tokens[:5]) >= alpha_thresh:
+        return True
+    # Let csv.Sniffer decide on tougher cases
+    try:
+        return csv.Sniffer().has_header(sample)
+    except csv.Error:
+        return False
 
 
 def sniff_delimiter(path: Path, sample_bytes: int = 2048, default: str = ",") -> str:
@@ -75,6 +89,10 @@ def sniff_delimiter(path: Path, sample_bytes: int = 2048, default: str = ",") ->
         return default
 
 
+def _strip_quotes(tokens: list[str]) -> list[str]:
+    return [t.strip('"') for t in tokens]
+
+
 def read_colnames(path: Path) -> list[str]:
     """
     Read the first line of a file and return column names split by its delimiter.
@@ -98,11 +116,15 @@ def read_colnames(path: Path) -> list[str]:
     `sniff_delimiter` to determine the appropriate delimiter.
     """
     delim = sniff_delimiter(path)
-    with path.open("r", encoding="utf-8") as fh:
-        return fh.readline().rstrip("\n\r").split(delim)
+    with path.open(encoding="utf-8") as fh:
+        first = fh.readline().rstrip("\n\r").split(delim)
+    return _strip_quotes(first)
 
 
-def patch_file(donor: Path, target: Path, *, write_back: bool = True) -> pd.DataFrame:
+def patch_file(
+    donor: Path,
+    target: Path,
+) -> pd.DataFrame:
     """
     Copy a header from a donor file and apply it to a target file.
 
@@ -117,9 +139,6 @@ def patch_file(donor: Path, target: Path, *, write_back: bool = True) -> pd.Data
         Path to the file that contains a valid header row.
     target : Path
         Path to the file that is missing a header.
-    write_back : bool, optional
-        If True, the target file is overwritten with the fixed version, and
-        a backup is saved with a `.bak` extension. Default is True.
 
     Returns
     -------
@@ -135,11 +154,10 @@ def patch_file(donor: Path, target: Path, *, write_back: bool = True) -> pd.Data
 
     df = pd.read_csv(target, header=None, names=cols, delimiter=delim)
 
-    if write_back:
-        bak = target.with_suffix(target.suffix + ".bak")
-        target.replace(bak)
-        df.to_csv(target, index=False, sep=delim)
-
+    # if write_back:
+    #    bak = target.with_suffix(target.suffix + ".bak")
+    #    target.replace(bak)
+    df.to_csv(target, index=False, sep=delim, quoting=csv.QUOTE_NONE, escapechar="\\")
     return df
 
 

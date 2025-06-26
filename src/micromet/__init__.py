@@ -9,4 +9,4 @@ from .variable_limits import *
 import pathlib
 import sys
 
-__version__ = "0.1.36"
+__version__ = "0.1.37"

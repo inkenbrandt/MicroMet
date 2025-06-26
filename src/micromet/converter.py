@@ -86,10 +86,6 @@ class AmerifluxDataProcessor:
         self,
         logger: logging.Logger = None,
     ):
-        # if config_path == "reformatter_vars.yml":
-        #    data_path = files("micromet.data").joinpath("reformatter_vars.yml")
-        # else:
-        #    data_path = Path(config_path)
         self.logger = logger_check(logger)
         # self.headers = load_yaml(data_path)
         self.skip_rows = 0
