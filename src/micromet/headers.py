@@ -116,9 +116,14 @@ def read_colnames(path: Path) -> list[str]:
     `sniff_delimiter` to determine the appropriate delimiter.
     """
     delim = sniff_delimiter(path)
-    with path.open(encoding="utf-8") as fh:
-        first = fh.readline().rstrip("\n\r").split(delim)
-    return _strip_quotes(first)
+    # with path.open(encoding="utf-8") as fh:
+    #    first = fh.readline().rstrip("\n\r").split(delim)
+    # return _strip_quotes(first)
+    delim = sniff_delimiter(path)
+    with path.open("rb") as fh:  # read binary
+        first = fh.readline().lstrip(b"\xef\xbb\xbf").decode()  # drop BOM
+    tokens = first.rstrip("\r\n").split(delim)
+    return [t.strip('"') for t in tokens]
 
 
 def patch_file(

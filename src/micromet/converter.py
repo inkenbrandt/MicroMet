@@ -554,10 +554,10 @@ class Reformatter:
         """
         df = df.copy()
         if self.varlimits is not None:
-            for col in set(df.columns) & set(self.varlimits.index):
+            for col in set(df.columns) & set(self.varlimits.keys()):
                 if df.dtypes[col] == "float64":
                     self.logger.debug(f"Examining column {col} limits")
-                    limits = self.varlimits.loc[col]
+                    limits = self.varlimits[col]
                     valid_mask = (df[col] > limits["Min"]) & (df[col] < limits["Max"])
                     df.loc[~valid_mask, col] = replace_w
                     # df[variable] = df[variable].apply(
@@ -857,7 +857,7 @@ class Reformatter:
         for col in df.columns:
             self.logger.debug(f"Setting number types {col}")
 
-            if col in ["MO_LENGTH", "RECORD"]:
+            if col in ["MO_LENGTH", "RECORD", "file_no", "datalogger_no"]:
                 df[col] = pd.to_numeric(df[col], downcast="integer", errors="coerce")
 
             elif col in ["datetime_start"]:
