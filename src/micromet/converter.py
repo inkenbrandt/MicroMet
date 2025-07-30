@@ -137,7 +137,7 @@ class AmerifluxDataProcessor:
             file_number = int(basename.split("_")[-1])
             datalogger_number = int(basename.split("_")[0])
         except ValueError:
-            file_number = datalogger_number = 9999
+            file_number = datalogger_number = -9999
         self.logger.debug(f"{file_number} -> {datalogger_number}")
         return file_number, datalogger_number
 
