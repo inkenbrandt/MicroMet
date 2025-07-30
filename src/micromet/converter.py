@@ -168,6 +168,7 @@ class AmerifluxDataProcessor:
         pandas.DataFrame or None
             Dataframe containing compiled AmeriFlux data, or None if no valid files found.
         """
+
         compiled_data = []
         station_folder = Path(main_dir) / station_folder_name
 
@@ -193,6 +194,7 @@ class AmerifluxDataProcessor:
 
     def iterate_through_stations(self):
         """Iterate through all stations."""
+
         site_folders = {
             "US-UTD": "Dugout_Ranch",
             "US-UTB": "BSF",
@@ -206,6 +208,38 @@ class AmerifluxDataProcessor:
             "US-UTN": "Juab",
             "US-UTG": "Green_River",
         }
+
+        loggerids = {
+            "eddy": {
+                "US-UTD": [21314],
+                "US-UTB": [27736],
+                "US-UTJ": [21020],
+                "US-UTW": [21025],
+                "US-UTE": [21021],
+                "US-UTM": [21022, 21029],
+                "US-UTP": [8442],
+                "US-CdM": [21313],
+                "US-UTV": [21027],
+                "US-UTN": [8441],
+                "US-UTG": [25415],
+                "US-UTL": [21215],
+            },
+            "met": {
+                "US-UTD": [21031],
+                "US-UTB": [27736],
+                "US-UTJ": [21030],
+                "US-UTW": [21026],
+                "US-UTE": [21032],
+                "US-UTM": [21024, 21023],
+                "US-UTP": [8441],
+                "US-CdM": [21029],
+                "US-UTV": [21311],
+                "US-UTN": [],
+                "US-UTG": [25414],
+                "US-UTL": [21028],
+            },
+        }
+
         data = {}
         for stationid, folder in site_folders.items():
             for datatype in ["met", "eddy"]:
@@ -213,7 +247,9 @@ class AmerifluxDataProcessor:
                     search_str = f"*Statistics_Ameriflux*.dat"
                 else:
                     search_str = f"*AmeriFluxFormat*.dat"
-                data[stationid] = self.raw_file_compile(stationid, folder, search_str)
+                data[stationid] = self.raw_file_compile(
+                    stationid, folder, search_str, loggerids[datatype][stationid][0]
+                )
 
 
 # ----------------------------------------------------------------------------
@@ -315,7 +351,7 @@ class Reformatter:
                 return cand
             else:
                 self.logger.warning("No TIMESTAMP column in dataframe")
-                return df.iloc[:, 0].name
+                return df.iloc[:, 0].name  # type: ignore
         return None
 
     def _fix_timestamps(self, df: pd.DataFrame) -> pd.DataFrame:
