@@ -84,7 +84,7 @@ class AmerifluxDataProcessor:
 
     def __init__(
         self,
-        logger: logging.Logger = None,
+        logger: logging.Logger = None,  # type: ignore
     ):
         self.logger = logger_check(logger)
         # self.headers = load_yaml(data_path)
@@ -95,7 +95,7 @@ class AmerifluxDataProcessor:
     # --------------------------------------------------------------------- #
     def to_dataframe(self, file: Union[str, Path]) -> pd.DataFrame:
         """Return parsed CSV as pandas DataFrame."""
-        self._determine_header_rows(file)
+        self._determine_header_rows(file)  # type: ignore
         self.logger.debug("Reading %s", file)
         df = pd.read_csv(
             file,
@@ -304,7 +304,7 @@ class Reformatter:
         self,
         var_limits_csv: str | Path | None = None,
         drop_soil: bool = True,
-        logger: logging.Logger = None,
+        logger: logging.Logger = None,  # type: ignore
     ):
         self.logger = logger_check(logger)
 

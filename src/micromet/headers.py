@@ -9,7 +9,7 @@ from collections import defaultdict
 # ──────────────────────────────────────────────────────────────────────────────
 # 1.  Tiny helpers
 # ──────────────────────────────────────────────────────────────────────────────
-def looks_like_header(line: str, alpha_thresh: int = 0.5) -> bool:
+def looks_like_header(line: str, alpha_thresh: int = 1) -> bool:
     """
     Heuristically determine if a line appears to be a header.
 
