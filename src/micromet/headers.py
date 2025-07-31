@@ -234,14 +234,14 @@ def fix_all_in_parent(parent: Path, searchstr: str = "*_AmeriFluxFormat_*.dat") 
         # Use the first header-bearing file as the “donor” for all others
         donor = header_files[0]
         for tgt in noheader_files:
-            df_fixed = patch_file(donor, tgt, write_back=True)
+            df_fixed = patch_file(donor, tgt)
             print(
                 f"[INFO]  Patched  {tgt.relative_to(parent)}   "
                 f"({len(df_fixed):,d} rows)"
             )
 
     print("\n✔ All possible files have been checked.")
-    return paths_by_name
+    return paths_by_name  # type: ignore
 
 
 def apply_header(
@@ -348,11 +348,3 @@ def fix_directory_pairs(dir_with_headers: Path, dir_without_headers: Path) -> No
 
         df_fixed = apply_header(header_index[f.name], f, inplace=True)
         print(f"[INFO] Patched header on {f} ({len(df_fixed)} rows)")
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# 3.  Example CLI usage
-# ──────────────────────────────────────────────────────────────────────────────
-if __name__ == "__main__":
-    root = Path(r"C:\data\logs")  # <── your top-level directory here
-    fix_all_in_parent(root, recurse=False)  # recurse=True if sub-sub-folders exist

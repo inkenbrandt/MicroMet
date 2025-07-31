@@ -244,12 +244,16 @@ class AmerifluxDataProcessor:
         for stationid, folder in site_folders.items():
             for datatype in ["met", "eddy"]:
                 if datatype == "met":
-                    search_str = f"*Statistics_Ameriflux*.dat"
+                    station_table_str = "Statistics_Ameriflux"
                 else:
-                    search_str = f"*AmeriFluxFormat*.dat"
-                data[stationid] = self.raw_file_compile(
-                    stationid, folder, search_str, loggerids[datatype][stationid][0]
-                )
+                    station_table_str = "AmeriFluxFormat"
+                for loggerid in loggerids[datatype][stationid]:
+                    search_str = f"{loggerid}*{station_table_str}*.dat"
+                    data[stationid] = self.raw_file_compile(
+                        stationid,
+                        folder,
+                        search_str,
+                    )
 
 
 # ----------------------------------------------------------------------------
