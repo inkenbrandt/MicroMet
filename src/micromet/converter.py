@@ -21,6 +21,8 @@ import logging
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Union
+import math
+
 
 import pandas as pd
 import numpy as np
@@ -29,6 +31,7 @@ from importlib.resources import files
 
 import micromet.reformatter_vars as reformatter_vars
 import micromet.variable_limits as variable_limits
+
 
 # -----------------------------------------------------------------------------#
 # Helper functions
@@ -324,24 +327,28 @@ class Reformatter:
     # ------------------------------------------------------------------
     # Pipeline entry
     # ------------------------------------------------------------------
-    def prepare(self, df: pd.DataFrame, data_type: str = "eddy") -> pd.DataFrame:
+    def prepare(
+        self, df: pd.DataFrame, data_type: str = "eddy"
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         self.logger.info("Starting reformat (%s rows)", len(df))
 
         df = (
             df.pipe(self._fix_timestamps)
             .pipe(self.rename_columns, data_type=data_type)
+            .pipe(self.make_unique_cols)
             .pipe(self.set_number_types)
             .pipe(self.resample_timestamps)
             .pipe(self.timestamp_reset)
-            .pipe(self.clean_columns)
-            .pipe(self.apply_fixes)
         )
+        df, mask, report = self.apply_physical_limits(df)
+        df = self.apply_fixes(df)
+
         if self.drop_soil:
             df = self._drop_extra_soil_columns(df)
 
         df = df.pipe(self._drop_extras).fillna(self.MISSING_VALUE)
         self.logger.info("Done; final shape: %s", df.shape)
-        return df
+        return df, report
 
     # ------------------------------------------------------------------
     # 1. Timestamp handling
@@ -566,45 +573,135 @@ class Reformatter:
     # Stage 3 – general clean
     # ------------------------------------------------------------------ #
 
-    def clean_columns(self, df, replace_w=np.nan):
+    def apply_physical_limits(
+        self,
+        df: pd.DataFrame,
+        how: str = "mask",  # "mask" -> set OOR to NaN; "clip" -> cap into [Min, Max]
+        inplace: bool = False,
+        prefer_longest_key: bool = True,
+        return_mask: bool = False,  # also return a boolean mask of flagged values
+    ) -> tuple[pd.DataFrame, pd.DataFrame | None, pd.DataFrame]:
         """
-        Replace out-of-range values in float64 columns with a specified placeholder.
-
-        For each float64 column in the DataFrame that has a defined limit in `self.varlimits`,
-        this method replaces values that fall outside the [Min, Max] range with a specified
-        replacement value (default is `np.nan`).
+        Apply physical Min/Max bounds to columns whose names start with keys in `limits_dict`.
 
         Parameters
         ----------
-        df : pandas.DataFrame
-            Input DataFrame containing the data to be cleaned.
-        replace_w : scalar, optional
-            Value to replace out-of-range entries with. Default is `np.nan`.
+        df : pd.DataFrame
+            Input dataframe with columns to validate.
+        how : {"mask","clip"}, default "mask"
+            - "mask": out-of-range (OOR) values become NaN
+            - "clip": OOR values are clipped to the nearest bound
+        inplace : bool, default False
+            If True, modify `df` in place; otherwise operate on a copy.
+        prefer_longest_key : bool, default True
+            If True, match using the *longest* key first so that
+            e.g. "SW_BC_IN_1" matches "SW_BC_IN" rather than "SW_".
+        return_mask : bool, default False
+            If True, also return a DataFrame of booleans where True marks OOR values.
 
         Returns
         -------
-        pandas.DataFrame
-            A copy of the input DataFrame with out-of-range values replaced.
+        out_df : pd.DataFrame
+            DataFrame with masking or clipping applied.
+        oor_mask : pd.DataFrame or None
+            Boolean mask of OOR values (only if return_mask=True).
+        report : pd.DataFrame
+            Per-column summary with counts of values below/above bounds.
 
         Notes
         -----
-        - The method only processes columns present in both the DataFrame and `self.varlimits`.
-        - Only columns of type `float64` are cleaned.
-        - Limit values must be stored in a DataFrame `self.varlimits` with columns "Min" and "Max".
+        - Columns are matched by `column_name.startswith(key)`.
+        - Values are compared numerically; non-numeric entries are coerced with `to_numeric(..., errors="coerce")`.
+        - Columns with no matching key are left unchanged.
         """
-        df = df.copy()
-        if self.varlimits is not None:
-            for col in set(df.columns) & set(self.varlimits.keys()):
-                if df.dtypes[col] == "float64":
-                    self.logger.debug(f"Examining column {col} limits")
-                    limits = self.varlimits[col]
-                    valid_mask = (df[col] > limits["Min"]) & (df[col] < limits["Max"])
-                    df.loc[~valid_mask, col] = replace_w
-                    # df[variable] = df[variable].apply(
-                    #    lambda x: replace_w if x < lower_bound or x > upper_bound else x
-                    # )
-        self.logger.debug(f"Cleaned rows: {len(df)}")
-        return df
+        if how not in {"mask", "clip"}:
+            raise ValueError("how must be 'mask' or 'clip'")
+
+        limits_dict = variable_limits.limits
+
+        out = df if inplace else df.copy()
+        keys = list(limits_dict.keys())
+        if prefer_longest_key:
+            keys.sort(key=len, reverse=True)
+
+        # Pre-build mapping: column -> (key, Min, Max)
+        col_map = {}
+        for key in keys:
+            # simple startswith is fastest & clearest for your column naming scheme
+            matching_cols = [c for c in out.columns if str(c).startswith(key)]
+            if not matching_cols:
+                continue
+            lim = limits_dict[key]
+            mn = lim.get("Min", np.nan)
+            mx = lim.get("Max", np.nan)
+            for col in matching_cols:
+                # only overwrite if this key is longer (more specific) than any previous match
+                if col not in col_map or (
+                    prefer_longest_key and len(key) > len(col_map[col]["key"])
+                ):
+                    col_map[col] = {"key": key, "Min": mn, "Max": mx}
+
+        # Prepare outputs
+        mask_df = pd.DataFrame(False, index=out.index, columns=out.columns)
+        records = []
+
+        for col, info in col_map.items():
+            key = info["key"]
+            mn = info["Min"]
+            mx = info["Max"]
+
+            # numeric compare; coerce to numeric (non-numeric -> NaN)
+            ser = pd.to_numeric(out[col], errors="coerce")
+
+            # Build bounds
+            lower_ok = (
+                ser >= mn
+                if not (pd.isna(mn) or (isinstance(mn, float) and math.isnan(mn)))
+                else pd.Series(True, index=ser.index)
+            )
+            upper_ok = (
+                ser <= mx
+                if not (pd.isna(mx) or (isinstance(mx, float) and math.isnan(mx)))
+                else pd.Series(True, index=ser.index)
+            )
+            ok = lower_ok & upper_ok
+            oor = ~ok
+
+            n_below = int((~lower_ok & ser.notna()).sum())
+            n_above = int((~upper_ok & ser.notna()).sum())
+            n_oor = int((oor & ser.notna()).sum())
+
+            if how == "mask":
+                ser_out = ser.where(ok)
+            else:  # clip
+                ser_out = ser
+                if not pd.isna(mn):
+                    ser_out = ser_out.clip(lower=mn)
+                if not pd.isna(mx):
+                    ser_out = ser_out.clip(upper=mx)
+
+            # write back preserving original dtype as float if masking/clipping introduces NaN
+            out[col] = ser_out.astype(float) if ser_out.isna().any() else ser_out
+            mask_df[col] = oor
+
+            records.append(
+                {
+                    "column": col,
+                    "matched_key": key,
+                    "min": mn,
+                    "max": mx,
+                    "n_below": n_below,
+                    "n_above": n_above,
+                    "n_flagged": n_oor,
+                    "pct_flagged": (n_oor / len(ser) * 100.0) if len(ser) else 0.0,
+                }
+            )
+
+        report = pd.DataFrame.from_records(records).sort_values(
+            ["n_flagged", "column"], ascending=[False, True]
+        )
+
+        return (out, (mask_df if return_mask else None), report)
 
     # ------------------------------------------------------------------ #
     # Stage 4 – variable‑specific fixes
@@ -693,11 +790,25 @@ class Reformatter:
         - Columns are modified in place within a copy of the DataFrame.
         - A debug log entry is created for each column that is converted.
         """
-        swc_cols = [c for c in df.columns if c.startswith("SWC_")]
-        for col in swc_cols:
-            if df[col].max(skipna=True) <= 1.5:  # likely 0–1 volumetric
-                df[col] = df[col] * 100.0
-                self.logger.debug(f"Fixed soil percent {col}")
+        df = df.copy()
+
+        # Used because some SWC columns may be duplicated
+        def _fix_one(s: pd.Series) -> pd.Series:
+            s = pd.to_numeric(s, errors="coerce")
+            m = s.max(skipna=True)
+            if pd.notna(m) and m <= 1.5:
+                s = s * 100.0
+                self.logger.debug(f"Converted {s.name} from fraction to percent")
+            return s
+
+        for name in [c for c in df.columns if str(c).startswith("SWC_")]:
+            obj = df.loc[:, name]
+            if isinstance(obj, pd.DataFrame):  # duplicated column name
+                for sub in obj.columns:  # each duplicate handled separately
+                    df[sub] = _fix_one(df[sub])
+            else:
+                df[name] = _fix_one(obj)
+
         return df
 
     def ssitc_scale(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -867,6 +978,62 @@ class Reformatter:
     # ------------------------------------------------------------------
     # 6. Final housekeeping
     # ------------------------------------------------------------------
+    def make_unique(self, cols):
+        """
+        Make column names unique by appending numeric suffixes to duplicates.
+
+        The first occurrence of a name is left unchanged; subsequent duplicates
+        are suffixed with ".1", ".2", etc. Suffixes are appended to the **entire**
+        name (after any trimming), preserving underscore-delimited semantics that
+        downstream code might rely on (e.g., ``col.split("_")``).
+
+        Parameters
+        ----------
+        cols : Sequence[Any]
+            Iterable of column labels (e.g., a Pandas ``Index`` or list). Labels
+            are converted to strings and processed in order.
+
+        Returns
+        -------
+        list of str
+            Column names of the same length as ``cols`` with duplicates made unique
+            via numeric suffixes. Order is preserved.
+
+        Notes
+        -----
+        - Time complexity is O(n) with a single pass over the labels.
+        - Only exact string-equal duplicates are suffixed; comparison is case
+        sensitive after string conversion.
+
+        Examples
+        --------
+        >>> _make_unique(["SWC_10", "TA", "SWC_10", "SWC_10", "TA"])
+        ['SWC_10', 'TA', 'SWC_10.1', 'SWC_10.2', 'TA.1']
+
+        >>> import pandas as pd
+        >>> df = pd.DataFrame([[1,2],[3,4]], columns=["x","x"])
+        >>> df.columns = _make_unique(df.columns)
+        >>> list(df.columns)
+        ['x', 'x.1']
+        """
+        seen = {}
+        out = []
+        for c in cols:
+            c = str(c)
+            if c in seen:
+                seen[c] += 1
+                out.append(f"{c}.{seen[c]}")  # SWC_3_1_1 -> SWC_3_1_1.1, .2, ...
+            else:
+                seen[c] = 0
+                out.append(c)
+        return out
+
+    def make_unique_cols(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Return a copy with duplicate column names suffixed .1, .2, ..."""
+        df = df.copy()
+        df.columns = self.make_unique(df.columns)  # reuse your helper
+        return df
+
     def set_number_types(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Convert columns in the DataFrame to numeric types where appropriate.
@@ -894,19 +1061,52 @@ class Reformatter:
         - Logging reports the number of rows processed.
         """
         self.logger.debug(f"Setting number types: {df.head(3)}")
+        dupes = pd.Series(df.columns).value_counts()
+        self.logger.debug(dupes[dupes > 1])
+
         for col in df.columns:
+
             self.logger.debug(f"Setting number types {col}")
 
-            if col in ["MO_LENGTH", "RECORD", "file_no", "datalogger_no"]:
-                df[col] = pd.to_numeric(df[col], downcast="integer", errors="coerce")
+            # Check if the column appears multiple times
+            pos = np.where(df.columns == col)[0]
+            if len(pos) == 1:
+                if col in ["MO_LENGTH", "RECORD", "file_no", "datalogger_no"]:
+                    df[col] = pd.to_numeric(
+                        df[col], downcast="integer", errors="coerce"
+                    )
 
-            elif col in ["datetime_start"]:
-                df[col] = df[col]
+                elif col in ["datetime_start"]:
+                    df[col] = df[col]
 
-            elif col in ["TIMESTAMP_START", "TIMESTAMP_END", "SSITC"]:
-                df[col] = pd.to_numeric(df[col], downcast="integer", errors="coerce")
+                elif col in ["TIMESTAMP_START", "TIMESTAMP_END", "SSITC"]:
+                    df[col] = pd.to_numeric(
+                        df[col], downcast="integer", errors="coerce"
+                    )
+                else:
+                    df[col] = pd.to_numeric(df[col], errors="coerce")
             else:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
+                self.logger.warning(f"Column {col} appears multiple times in DataFrame")
+                # handle each duplicate instance separately
+                for p in pos:
+                    s = df.iloc[:, p]
+                    if col in [
+                        "MO_LENGTH",
+                        "RECORD",
+                        "file_no",
+                        "datalogger_no",
+                        "TIMESTAMP_START",
+                        "TIMESTAMP_END",
+                        "SSITC",
+                    ]:
+                        df.iloc[:, p] = pd.to_numeric(
+                            s, downcast="integer", errors="coerce"
+                        )
+                    elif col == "datetime_start":
+                        continue
+                    else:
+                        df.iloc[:, p] = pd.to_numeric(s, errors="coerce")
+
         self.logger.debug(f"Set number types: {len(df)}")
         return df
 

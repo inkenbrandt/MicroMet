@@ -6,19 +6,19 @@ limits = {
         "Description": "ISO timestamp – short format",
         "Units": "YYYYMMDDHHMM",
         "Min": 198001010000,
-        "Max": f"{datetime.datetime.now():%Y%m%d%H%M}",
+        "Max": int(f"{datetime.datetime.now():%Y%m%d%H%M}"),
     },
     "TIMESTAMP_END": {
         "Description": "ISO timestamp end of averaging period - short format (12-digit integer)",
         "Units": "YYYYMMDDHHMM",
-        "Min": np.nan,
-        "Max": np.nan,
+        "Min": 198001010000,
+        "Max": int(f"{datetime.datetime.now():%Y%m%d%H%M}"),
     },
     "TIMESTAMP_START": {
         "Description": "ISO timestamp start of averaging period - short format (12-digit integer)",
         "Units": "YYYYMMDDHHMM",
         "Min": 198001010000,
-        "Max": f"{datetime.datetime.now():%Y%m%d%H%M}",
+        "Max": int(f"{datetime.datetime.now():%Y%m%d%H%M}"),
     },
     "COND_WATER": {
         "Description": "Conductivity (i.e., electrical conductivity) of water",

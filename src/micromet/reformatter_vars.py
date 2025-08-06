@@ -1,5 +1,5 @@
 config = {
-    "col_name_match": {
+    "renames_eddy": {
         "ET": "ET_1_1_1",
         "LE": "LE_1_1_1",
         "H": "H_1_1_1",
@@ -8,11 +8,11 @@ config = {
         "TA": "TA_1_1_1",
         "RH": "RH_1_1_1",
         "ALB": "ALB_1_1_1",
-        "NETRAD": "NETRAD_1_1_2",
-        "SW_IN": "SW_IN_1_1_2",
-        "SW_OUT": "SW_OUT_1_1_2",
-        "LW_IN": "LW_IN_1_1_2",
-        "LW_OUT": "LW_OUT_1_1_2",
+        "NETRAD": "NETRAD_1_1_1",
+        "SW_IN": "SW_IN_1_1_1",
+        "SW_OUT": "SW_OUT_1_1_1",
+        "LW_IN": "LW_IN_1_1_1",
+        "LW_OUT": "LW_OUT_1_1_1",
         "TA_1_1_2": "TA_1_2_1",
         "RH_1_1_2": "RH_1_2_1",
         "T_DP_1_1_2": "T_DP_1_2_1",

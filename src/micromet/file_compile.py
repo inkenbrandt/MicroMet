@@ -2,9 +2,6 @@
 """
 Compile files by substring into a single directory.
 
-Usage:
-  python compile_files.py --root /path/to/root --out /path/to/eddy --contains "21020_Flux_AmeriFluxFormat_"
-
 Key logic:
 - Group by exact filename (case-sensitive match on the filename itself).
 - Within each group, deduplicate items that have the *same* (creation_time, size).
@@ -204,58 +201,4 @@ def compile_files(
 
     print(
         f"Done. Copied: {copied}, Sequentially labeled: {made_sequential}, Skipped duplicates: {skipped_dup}"
-    )
-
-
-def parse_args(argv: List[str]) -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        description="Copy & compile files by substring, handling same-name duplicates."
-    )
-    p.add_argument(
-        "--root",
-        required=True,
-        type=Path,
-        help="Root directory to search (recursively).",
-    )
-    p.add_argument(
-        "--out",
-        required=True,
-        type=Path,
-        help="Output directory to place compiled files.",
-    )
-    p.add_argument(
-        "--contains", required=True, type=str, help="Substring to match in filenames."
-    )
-    p.add_argument(
-        "--case-sensitive",
-        action="store_true",
-        help="Make substring matching case-sensitive.",
-    )
-    p.add_argument(
-        "--dry-run", action="store_true", help="Print actions without copying."
-    )
-    p.add_argument(
-        "--use-mtime",
-        action="store_true",
-        help="Use modification time instead of creation time.",
-    )
-    p.add_argument(
-        "--pad",
-        type=int,
-        default=1,
-        help="Zero padding width for sequential suffix (default: 1).",
-    )
-    return p.parse_args(argv)
-
-
-if __name__ == "__main__":
-    args = parse_args(sys.argv[1:])
-    compile_files(
-        root=args.root,
-        outdir=args.out,
-        contains=args.contains,
-        case_sensitive=args.case_sensitive,
-        dry_run=args.dry_run,
-        use_mtime=args.use_mtime,
-        sequential_zero_pad=args.pad,
     )
