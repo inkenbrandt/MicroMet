@@ -11,3 +11,6 @@ pyyaml
 pytest
 requests
 pytz
+pyarrow
+typer
+pydantic
