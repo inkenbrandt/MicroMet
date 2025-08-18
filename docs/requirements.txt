@@ -10,3 +10,4 @@ scipy
 pyyaml
 pytest
 requests
+pytz
