@@ -50,7 +50,7 @@ class StationDataDownloader:
     def __init__(
         self,
         config: Union[configparser.ConfigParser, dict],
-        logger: logging.Logger = None,
+        logger: logging.Logger | None = None,
     ):
         """
         Initialize the StationDataManager with configuration and database engine.
@@ -203,7 +203,7 @@ class StationDataProcessor(StationDataDownloader):
         self,
         config: Union[configparser.ConfigParser, dict],
         engine: sqlalchemy.engine.base.Engine,
-        logger: logging.Logger = None,
+        logger: logging.Logger | None = None,
     ):
 
         super().__init__(config, logger)
@@ -244,7 +244,6 @@ class StationDataProcessor(StationDataDownloader):
         if status_code == 200:
             if raw_data is not None and reformat:
                 am_data = Reformatter(
-                    config_path=config_path,
                     var_limits_csv=var_limits_csv,
                     drop_soil=drop_soil,
                 )
@@ -264,7 +263,7 @@ class StationDataProcessor(StationDataDownloader):
         df: pd.DataFrame,
         column_to_check: str,
         values_to_remove: list,
-        logger: logging.Logger = None,
+        logger: logging.Logger | None = None,
     ) -> pd.DataFrame:
         """
         Remove existing records from DataFrame.
@@ -320,7 +319,7 @@ class StationDataProcessor(StationDataDownloader):
         exist = pd.read_sql(query, con=self.engine)
         existing = exist["timestamp_end"].values
 
-        return self.remove_existing_records(df, field, existing, self.logger)
+        return self.remove_existing_records(df, field, existing, self.logger)  # type: ignore
 
     def get_max_date(self, station: str, loggertype: str = "eddy") -> datetime.datetime:
         """

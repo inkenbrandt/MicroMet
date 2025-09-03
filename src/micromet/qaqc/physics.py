@@ -81,11 +81,11 @@ def _has(df: pd.DataFrame, cols: Iterable[str]) -> bool:
 
 def _dt_index(df: pd.DataFrame) -> pd.DatetimeIndex:
     if COL_TSTART in df.columns:
-        return pd.to_datetime(df[COL_TSTART], errors="coerce")
+        return pd.to_datetime(df[COL_TSTART], errors="coerce")  # type: ignore
     # fallback: try the index
     if isinstance(df.index, pd.DatetimeIndex):
         return df.index
-    return pd.to_datetime(pd.Series([pd.NaT] * len(df)))
+    return pd.to_datetime(pd.Series([pd.NaT] * len(df)))  # type: ignore
 
 
 # ---------------------------------------------------------------------
@@ -232,7 +232,7 @@ def midday_mask(
     dt = _dt_index(df)
     if dt.isna().all():
         return pd.Series(False, index=df.index)
-    hrs = dt.dt.hour
+    hrs = dt.dt.hour  # type: ignore
     return ((hrs >= start_hour) & (hrs < end_hour)).reindex(df.index, fill_value=False)
 
 

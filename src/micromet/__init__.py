@@ -6,7 +6,7 @@ from .format.headers import *
 from .format.reformatter_vars import *
 from .qaqc.variable_limits import *
 from .format.add_header_from_peer import *
-from .format.compare import *
+from .qaqc.compare import *
 
 import pathlib
 import sys

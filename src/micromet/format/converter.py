@@ -184,8 +184,8 @@ class AmerifluxDataProcessor:
 
             df = self.to_dataframe(file)
             if df is not None:
-                df["file_no"] = file_no
-                df["datalogger_no"] = datalogger_number
+                df["FILE_NO"] = file_no
+                df["DATALOGGER_NO"] = datalogger_number
                 compiled_data.append(df)
 
         if compiled_data:
@@ -277,12 +277,12 @@ class Reformatter:
 
     Parameters
     ----------
-    config_path : str | Path
-        File Path to YAML configuration file governing renames, drops, etc.
     var_limits_csv : str | Path, optional
-        CSV file containing per‑variable hard min/max limits.
+        CSV file containing per-variable hard min/max limits.
     drop_soil : bool, default True
         Whether to remove soil columns deemed redundant (see config).
+    logger : logging.Logger, optional
+        Logger to use.
     """
 
     # SoilVUE Depth/orientation conversion tables --------------------------------
@@ -306,7 +306,7 @@ class Reformatter:
     def __init__(
         self,
         var_limits_csv: str | Path | None = None,
-        drop_soil: bool = True,
+        drop_soil: bool = False,
         logger: logging.Logger = None,  # type: ignore
     ):
         self.logger = logger_check(logger)
@@ -373,40 +373,40 @@ class Reformatter:
         self.logger.debug(f"TS col {ts_col}")
         self.logger.debug(f"TIMESTAMP_START col {df[ts_col][0]}")
         ts_format = "%Y%m%d%H%M"
-        df["datetime_start"] = pd.to_datetime(
+        df["DATETIME_START"] = pd.to_datetime(
             df[ts_col], format=ts_format, errors="coerce"
         )
         self.logger.debug(f"Len of unfixed timestamps {len(df)}")
-        df = df.dropna(subset=["datetime_start"])
+        df = df.dropna(subset=["DATETIME_START"])
         self.logger.debug(f"Len of fixed timestamps {len(df)}")
         return df
 
     def resample_timestamps(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Resample a DataFrame to 30-minute intervals based on the 'datetime_start' column.
+        Resample a DataFrame to 30-minute intervals based on the 'DATETIME_START' column.
 
         The method performs the following steps:
         - Filters out future timestamps beyond the current date.
-        - Removes duplicate entries based on 'datetime_start'.
-        - Sets 'datetime_start' as the index and sorts the DataFrame.
+        - Removes duplicate entries based on 'DATETIME_START'.
+        - Sets 'DATETIME_START' as the index and sorts the DataFrame.
         - Resamples the data to 30-minute intervals using the first valid observation.
         - Linearly interpolates missing values with a maximum gap of one interval.
 
         Parameters
         ----------
         df : pd.DataFrame
-            Input DataFrame containing a 'datetime_start' column of timestamp values.
+            Input DataFrame containing a 'DATETIME_START' column of timestamp values.
 
         Returns
         -------
         pd.DataFrame
-            Resampled and interpolated DataFrame indexed by 'datetime_start'.
+            Resampled and interpolated DataFrame indexed by 'DATETIME_START'.
         """
         today = pd.Timestamp("today").floor("D")
-        df = df[df["datetime_start"] <= today]
+        df = df[df["DATETIME_START"] <= today]
         df = (
-            df.drop_duplicates(subset=["datetime_start"])
-            .set_index("datetime_start")
+            df.drop_duplicates(subset=["DATETIME_START"])
+            .set_index("DATETIME_START")
             .sort_index()
         )
         df = df.resample("30min").first().interpolate(limit=1)
@@ -473,6 +473,8 @@ class Reformatter:
             "renames_eddy" if data_type == "eddy" else "renames_met", {}
         )
         self.logger.debug(f"Renaming columns from {df.columns} to {mapping}")
+        # Convert all column names to uppercase
+        df.columns = df.columns.str.upper()
         df = df.rename(columns=mapping)
         df = self.normalize_prefixes(df)
         df = self.modernize_soil_legacy(df)
@@ -514,7 +516,7 @@ class Reformatter:
             else:
                 # Conditional T_ rule – only if immediately followed by depthcm_
                 if re.match(r"^T_\d{1,3}cm_", col, flags=re.IGNORECASE):
-                    rename_map[col] = re.sub(r"^T_", "Ts_", col, flags=re.IGNORECASE)
+                    rename_map[col] = re.sub(r"^T_", "TS_", col, flags=re.IGNORECASE)
         if rename_map:
             self.logger.debug("Prefix normalisation: %s", rename_map)
             df = df.rename(columns=rename_map)
@@ -1056,7 +1058,7 @@ class Reformatter:
         -----
         - 'MO_LENGTH' and 'RECORD' columns are downcast to integer.
         - 'TIMESTAMP_START', 'TIMESTAMP_END', and 'SSITC' are also downcast to integer.
-        - 'datetime_start' is left unchanged.
+        - 'DATETIME_START' is left unchanged.
         - All other columns are converted to numeric (float) with `errors='coerce'`.
         - Logging reports the number of rows processed.
         """
@@ -1076,7 +1078,7 @@ class Reformatter:
                         df[col], downcast="integer", errors="coerce"
                     )
 
-                elif col in ["datetime_start"]:
+                elif col in ["DATETIME_START"]:
                     df[col] = df[col]
 
                 elif col in ["TIMESTAMP_START", "TIMESTAMP_END", "SSITC"]:
@@ -1093,8 +1095,8 @@ class Reformatter:
                     if col in [
                         "MO_LENGTH",
                         "RECORD",
-                        "file_no",
-                        "datalogger_no",
+                        "FILE_NO",
+                        "DATALOGGER_NO",
                         "TIMESTAMP_START",
                         "TIMESTAMP_END",
                         "SSITC",
@@ -1102,7 +1104,7 @@ class Reformatter:
                         df.iloc[:, p] = pd.to_numeric(
                             s, downcast="integer", errors="coerce"
                         )
-                    elif col == "datetime_start":
+                    elif col == "DATETIME_START":
                         continue
                     else:
                         df.iloc[:, p] = pd.to_numeric(s, errors="coerce")
