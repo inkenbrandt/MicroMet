@@ -378,7 +378,7 @@ def validate_amf_dataframe(
     ok = (
         len(missing) == 0
         and not issues["illegal_sentinels_present"]
-        and issues["timestamps"].get("uniform_30min", False)
+        and issues["timestamps"].get("uniform_30min", False)  # type: ignore[return-value]
     )  # type: ignore[return-value]
 
     return ValidationResult(ok=bool(ok), issues=issues)

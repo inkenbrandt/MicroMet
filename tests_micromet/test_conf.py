@@ -19,9 +19,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../s
 # tests/test_station_data_pull.py
 
 from micromet.station_data_pull import StationDataManager
-from micromet import graphs
+from micromet.report import graphs
 
-from micromet import tools
+from micromet.report import tools
+
+
 # ------------------------------------------------------------------ #
 #  Generic fixtures
 # ------------------------------------------------------------------ #
@@ -111,7 +113,6 @@ def response_json(monkeypatch):
     monkeypatch.setattr("requests.get", lambda *a, **k: FakeResponse())
 
 
-
 def test_get_station_id():
     assert StationDataManager.get_station_id("US-UTD") == "UTD"
 
@@ -134,16 +135,17 @@ def test_remove_existing_records():
     filtered = StationDataManager.remove_existing_records(df, "id", [2, 3])
     assert list(filtered["id"]) == [1, 4]
 
+
 def test_mean_squared_error_simple():
     a = pd.Series([1, 2, 3])
     b = pd.Series([1, 2, 4])
     assert graphs.mean_squared_error(a, b) == 1 / 3
 
 
-
-
 def test_find_irr_dates_detects_peak():
-    idx = pd.date_range(pd.to_datetime("2024-05-01",format='%Y-%m-%d'), periods=100, freq="h")
+    idx = pd.date_range(
+        pd.to_datetime("2024-05-01", format="%Y-%m-%d"), periods=100, freq="h"
+    )
     swc = pd.Series(20, index=idx)
     swc.iloc[10] = 60  # spike
     df = pd.DataFrame({"SWC_1_1_1": swc})
