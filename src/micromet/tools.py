@@ -534,7 +534,7 @@ def filter_near_neutral(z_over_L, lower=-0.1, upper=0.0):
     Default uses -0.1 < z/L < 0 as in Paw U et al. (2025):contentReference[oaicite:13]{index=13}.
     """
     z_over_L = np.asarray(z_over_L, dtype=float)
-    mask = (z_over_L > lower) & (z_over_L < upper)
+    mask = (z_over_L >= lower) & (z_over_L < upper)
     return mask
 
 
