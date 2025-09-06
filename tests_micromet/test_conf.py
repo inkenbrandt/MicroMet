@@ -18,7 +18,7 @@ sys.path.append("../src")
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 # tests/test_station_data_pull.py
 
-from micromet.station_data_pull import StationDataManager
+from micromet.station_data_pull import StationDataDownloader, StationDataProcessor
 from micromet import graphs
 
 from micromet import tools
@@ -113,16 +113,16 @@ def response_json(monkeypatch):
 
 
 def test_get_station_id():
-    assert StationDataManager.get_station_id("US-UTD") == "UTD"
+    assert StationDataDownloader.get_station_id("US-UTD") == "UTD"
 
 
 def test__get_port(fake_config, toy_engine):
-    sdm = StationDataManager(fake_config, toy_engine)
+    sdm = StationDataDownloader(fake_config)
     assert sdm._get_port("UTD", "eddy") == 80
 
 
 def test_get_times(fake_config, toy_engine, response_json):
-    sdm = StationDataManager(fake_config, toy_engine)
+    sdm = StationDataDownloader(fake_config)
     logger_time, comp_time = sdm.get_times("UTD", loggertype="eddy")
     assert logger_time == "2025‑01‑01 00:00:00"
     # comp_time should parse into a datetime without error
@@ -131,7 +131,7 @@ def test_get_times(fake_config, toy_engine, response_json):
 
 def test_remove_existing_records():
     df = pd.DataFrame({"id": [1, 2, 3, 4]})
-    filtered = StationDataManager.remove_existing_records(df, "id", [2, 3])
+    filtered = StationDataProcessor.remove_existing_records(df, "id", [2, 3])
     assert list(filtered["id"]) == [1, 4]
 
 def test_mean_squared_error_simple():
