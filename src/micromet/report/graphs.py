@@ -8,13 +8,21 @@ import logging
 
 def logger_check(logger: logging.Logger | None) -> logging.Logger:
     """
-    Check if a logger is provided, and if not, create one.
+    Initialize and return a logger instance if none is provided.
 
-    Args:
-        logger: Logger to check
+    This function checks if a logger object is provided. If not, it
+    creates a new logger with a default warning level and a stream
+    handler that outputs to the console.
 
-    Returns:
-        Logger to use
+    Parameters
+    ----------
+    logger : logging.Logger or None
+        An existing logger instance. If None, a new logger is created.
+
+    Returns
+    -------
+    logging.Logger
+        A configured logger instance.
     """
     if logger is None:
         logger = logging.getLogger(__name__)
@@ -36,51 +44,37 @@ def logger_check(logger: logging.Logger | None) -> logging.Logger:
 
 def energy_sankey(df, date_text="2024-06-19 12:00", logger: logging.Logger = None):
     """
-    Create a Sankey diagram representing the energy balance for a specific date and time.
+    Create a Sankey diagram of energy balance for a specific time.
 
-    This function generates a Sankey diagram to visualize the flow of energy in a system,
-    typically used in meteorological or environmental studies. It calculates various
-    energy balance components and creates a diagram showing their relationships.
+    This function generates a Sankey diagram to visualize the flow of
+    energy components in a system. It is typically used in
+    meteorological or environmental studies.
 
     Parameters
     ----------
-    df : pandas.DataFrame
-        A DataFrame with time series data and the following columns:
-        'SW_IN', 'LW_IN', 'SW_OUT', 'LW_OUT', 'NETRAD', 'G', 'LE', 'H'.
-        The index must be a pandas.DatetimeIndex.
+    df : pd.DataFrame
+        A DataFrame with a DatetimeIndex and columns for energy
+        components: 'SW_IN', 'LW_IN', 'SW_OUT', 'LW_OUT', 'NETRAD',
+        'G', 'LE', 'H'.
     date_text : str, optional
-        Date and time to extract from the DataFrame (default is "2024-06-19 12:00").
+        The date and time for which to plot the energy balance, in a
+        format recognized by `pd.to_datetime`. Defaults to
+        "2024-06-19 12:00".
+    logger : logging.Logger, optional
+        A logger for outputting debug information. If None, a default
+        logger is created.
 
     Returns
     -------
-    plotly.graph_objs._figure.Figure
+    go.Figure
         A Plotly Figure object containing the Sankey diagram.
 
     Notes
     -----
-    - The energy balance ratio (EBR) is calculated as (H + LE) / (NETRAD - G).
-    - The residual term is computed as: NETRAD - (G + H + LE).
-
-    Energy Balance Components
-    -------------------------
-    - SW_IN: Incoming Shortwave Radiation
-    - LW_IN: Incoming Longwave Radiation
-    - SW_OUT: Outgoing Shortwave Radiation
-    - LW_OUT: Outgoing Longwave Radiation
-    - NETRAD: Net Radiation
-    - G: Ground Heat Flux
-    - LE: Latent Heat
-    - H: Sensible Heat
-
-    Examples
-    --------
-    >>> import pandas as pd
-    >>> fig = energy_sankey(df, "2024-06-19 12:00")
-    >>> fig.show()
-
-    See Also
-    --------
-    plotly.graph_objs.Sankey : For creating Sankey diagrams with Plotly.
+    The energy balance ratio (EBR) is calculated as:
+    (H + LE) / (NETRAD - G)
+    The residual term is computed as:
+    NETRAD - (G + H + LE)
     """
     select_date = pd.to_datetime(date_text)
     swi = df.loc[select_date, "SW_IN"]
@@ -152,46 +146,40 @@ def energy_sankey(df, date_text="2024-06-19 12:00", logger: logging.Logger = Non
 
 def scatterplot_instrument_comparison(edmet, compare_dict, station, logger: logging.Logger = None):
     """
-    Generate a scatterplot comparing two instrument measurements with regression analysis.
+    Generate a scatter plot comparing two instrument measurements.
 
-    This function compares two instruments specified in `compare_dict` by plotting
-    their 1-hour mean values, interpolating missing data, and performing linear regression.
-    It includes a 1:1 reference line and displays key regression statistics.
+    This function creates a scatter plot to compare measurements from two
+    instruments, including a linear regression fit and a 1:1 reference
+    line.
 
     Parameters
     ----------
-    edmet : pandas.DataFrame
-        DataFrame containing environmental measurements, indexed by datetime.
+    edmet : pd.DataFrame
+        A DataFrame with a DatetimeIndex containing the measurement data.
     compare_dict : dict
-        Dictionary where keys are instrument column names and values are tuples of
-        metadata in the format (variable, instrument label, units).
+        A dictionary mapping the instrument column names to their
+        metadata (variable, label, units).
     station : str
-        Identifier for the station to annotate the plot title.
+        The identifier for the station, used in the plot title.
+    logger : logging.Logger, optional
+        A logger for outputting regression statistics.
 
     Returns
     -------
     slope : float
-        Slope of the linear regression line.
+        The slope of the linear regression line.
     intercept : float
-        Intercept of the linear regression line.
+        The intercept of the linear regression line.
     r_squared : float
-        Coefficient of determination ($R^2$) from the regression.
+        The R-squared value of the regression.
     p_value : float
-        Two-sided p-value for a hypothesis test whose null hypothesis is that the slope is zero.
+        The p-value of the regression.
     std_err : float
-        Standard error of the estimated slope.
-    fig : matplotlib.figure.Figure
-        The matplotlib figure object.
-    ax : matplotlib.axes.Axes
-        The matplotlib axes object containing the plot.
-
-    Notes
-    -----
-    - Missing values (-9999) are replaced with NaN before processing.
-    - The data is resampled to hourly frequency and linearly interpolated.
-    - The regression line and 1:1 line are plotted for visual comparison.
-    - X and Y axes are labeled using metadata from `compare_dict`.
-    - The function both displays the plot and prints regression statistics.
+        The standard error of the regression estimate.
+    fig : plt.Figure
+        The matplotlib Figure object.
+    ax : plt.Axes
+        The matplotlib Axes object.
     """
     # Compare two instruments
     instruments = list(compare_dict.keys())
@@ -243,7 +231,7 @@ def scatterplot_instrument_comparison(edmet, compare_dict, station, logger: logg
 
 def mean_squared_error(series1: pd.Series, series2: pd.Series) -> float:
     """
-    Calculate the mean squared error between two pandas Series.
+    Calculate the Mean Squared Error (MSE) between two series.
 
     Parameters
     ----------
@@ -255,12 +243,12 @@ def mean_squared_error(series1: pd.Series, series2: pd.Series) -> float:
     Returns
     -------
     float
-        The mean squared error between the two series.
+        The Mean Squared Error between the two series.
 
     Raises
     ------
     ValueError
-        If the input Series are not the same length.
+        If the input series are not of the same length.
     """
     if len(series1) != len(series2):
         raise ValueError("Input Series must be of the same length.")
@@ -280,72 +268,39 @@ def mean_diff_plot(
     """
     Construct a Tukey/Bland-Altman Mean Difference Plot.
 
-    Tukey's Mean Difference Plot (also known as a Bland-Altman plot) is a
-    graphical method to analyze the differences between two methods of
-    measurement. The mean of the measures is plotted against their difference.
-
-    For more information see
-    https://en.wikipedia.org/wiki/Bland-Altman_plot
+    This plot shows the difference between two measurements against
+    their mean, which is useful for assessing the agreement between
+    two measurement methods.
 
     Parameters
     ----------
     m1 : array_like
-        A 1-d array.
+        A 1-D array of measurements.
     m2 : array_like
-        A 1-d array.
-    sd_limit : float
-        The limit of agreements expressed in terms of the standard deviation of
-        the differences. If `md` is the mean of the differences, and `sd` is
-        the standard deviation of those differences, then the limits of
-        agreement that will be plotted are md +/- sd_limit * sd.
-        The default of 1.96 will produce 95% confidence intervals for the means
-        of the differences. If sd_limit = 0, no limits will be plotted, and
-        the ylimit of the plot defaults to 3 standard deviations on either
-        side of the mean.
-    ax : AxesSubplot
-        If `ax` is None, then a figure is created. If an axis instance is
-        given, the mean difference plot is drawn on the axis.
-    scatter_kwds : dict
-        Options to to style the scatter plot. Accepts any keywords for the
-        matplotlib Axes.scatter plotting method
-    mean_line_kwds : dict
-        Options to to style the scatter plot. Accepts any keywords for the
-        matplotlib Axes.axhline plotting method
-    limit_lines_kwds : dict
-        Options to to style the scatter plot. Accepts any keywords for the
-        matplotlib Axes.axhline plotting method
+        A 1-D array of measurements.
+    sd_limit : float, optional
+        The number of standard deviations to use for the limits of
+        agreement. Defaults to 1.96 (for 95% confidence).
+    ax : plt.Axes, optional
+        An existing matplotlib Axes to draw the plot on. If None, a
+        new figure and axes are created.
+    scatter_kwds : dict, optional
+        Keyword arguments for the scatter plot.
+    mean_line_kwds : dict, optional
+        Keyword arguments for the mean difference line.
+    limit_lines_kwds : dict, optional
+        Keyword arguments for the limits of agreement lines.
 
     Returns
     -------
-    Figure
-        If `ax` is None, the created figure.  Otherwise the figure to which
-        `ax` is connected.
+    plt.Figure
+        The matplotlib Figure object.
 
     References
     ----------
-    Bland JM, Altman DG (1986). "Statistical methods for assessing agreement
-    between two methods of clinical measurement"
-
-    Examples
-    --------
-
-    Load relevant libraries.
-
-    >>> import numpy as np
-    >>> import matplotlib.pyplot as plt
-
-    Making a mean difference plot.
-
-    >>> # Seed the random number generator.
-    >>> # This ensures that the results below are reproducible.
-    >>> np.random.seed(9999)
-    >>> m1 = np.random.random(20)
-    >>> m2 = np.random.random(20)
-    >>> f, ax = plt.subplots(1, figsize = (8,5))
-    >>> mean_diff_plot(m1, m2, ax = ax)
-    >>> plt.show()
-
-    .. plot:: plots/graphics-mean_diff_plot.py
+    Bland, J. M., & Altman, D. G. (1986). Statistical methods for
+    assessing agreement between two methods of clinical measurement.
+    The lancet, 327(8476), 307-310.
     """
     fig, ax = plt.subplots(figsize=(10, 8))
 
@@ -424,39 +379,31 @@ def mean_diff_plot(
 
 def bland_alt_plot(edmet, compare_dict, station, alpha=0.5, logger: logging.Logger = None):
     """
-    Create a Bland–Altman plot to assess agreement between two instruments.
+    Create a Bland-Altman plot to assess agreement between instruments.
 
-    This function compares two instruments specified in `compare_dict` by plotting the
-    mean of their measurements against their difference. It reports the root mean square error
-    (RMSE), bias, and spread, and visualizes the limits of agreement.
+    This function generates a Bland-Altman plot to visualize the
+    agreement between two instruments, including the bias and limits
+    of agreement.
 
     Parameters
     ----------
-    edmet : pandas.DataFrame
-        DataFrame containing environmental measurements, indexed by datetime.
+    edmet : pd.DataFrame
+        A DataFrame with a DatetimeIndex containing measurement data.
     compare_dict : dict
-        Dictionary where keys are instrument column names and values are tuples of
-        metadata in the format (variable, instrument label, units).
+        A dictionary mapping instrument column names to their metadata.
     station : str
-        Name or identifier for the measurement station, used in plot titles.
+        The identifier for the station, used in the plot title.
     alpha : float, optional
-        Transparency of the plot elements. Default is 0.5.
+        The transparency level for the plot elements. Defaults to 0.5.
+    logger : logging.Logger, optional
+        A logger for outputting statistics.
 
     Returns
     -------
-    f : matplotlib.figure.Figure
-        The matplotlib figure object containing the plot.
-    ax : matplotlib.axes.Axes
-        The matplotlib axes object for the Bland–Altman plot.
-
-    Notes
-    -----
-    - Missing values (-9999) are replaced with NaN before processing.
-    - Data is resampled to hourly frequency and linearly interpolated.
-    - Bias is calculated as the mean difference between instruments.
-    - Spread is the standard deviation of the difference.
-    - Limits of agreement are shown at ±1.96 × standard deviation.
-    - The `mean_diff_plot` utility is used for plotting.
+    f : plt.Figure
+        The matplotlib Figure object.
+    ax : plt.Axes
+        The matplotlib Axes object.
     """
     # Compare two instruments
     instruments = list(compare_dict.keys())
@@ -513,36 +460,28 @@ def plot_timeseries_daterange(
     input_df, selected_station, selected_field, start_date, end_date
 ):
     """
-    Plot a time series for a specific station and variable within a date range.
+    Plot a time series for a specific station and variable over a date range.
 
-    This function extracts and visualizes a single time series from a multi-station
-    DataFrame, limited to a specified date range and filtered by station ID and
-    data field. It handles missing values and generates a time series plot.
+    This function filters a DataFrame by station and date range, and then
+    plots the selected variable over time.
 
     Parameters
     ----------
-    input_df : pandas.DataFrame
-        DataFrame containing a multi-index (station, timestamp) with time series data.
+    input_df : pd.DataFrame
+        A DataFrame with a MultiIndex (station, timestamp).
     selected_station : str
-        Station identifier to select from the DataFrame.
+        The identifier of the station to plot.
     selected_field : str
-        Column name of the variable to plot (e.g., temperature, humidity).
-    start_date : str or pandas.Timestamp
-        Start date of the time range to include in the plot.
-    end_date : str or pandas.Timestamp
-        End date of the time range to include in the plot.
+        The name of the column (variable) to plot.
+    start_date : str or pd.Timestamp
+        The start date of the time range.
+    end_date : str or pd.Timestamp
+        The end date of the time range.
 
     Returns
     -------
     None
-        Displays a matplotlib plot but does not return any value.
-
-    Notes
-    -----
-    - Assumes `input_df` is indexed by station and datetime (MultiIndex).
-    - Missing values equal to -9999 are replaced with NaN prior to plotting.
-    - The function sets global variables `fig` and `ax`, which may overwrite
-      other plots in an interactive session.
+        This function displays a plot but does not return any objects.
     """
     global fig, ax
     # ax.clear()
@@ -567,7 +506,19 @@ def plot_timeseries_daterange(
 
 def save_plot(b):
     """
-    Saves plot for an interactive notebook button function
+    Save the current matplotlib figure to a file.
+
+    This function is intended to be used as a callback for an
+    interactive widget, such as a button in a Jupyter notebook.
+
+    Parameters
+    ----------
+    b : object
+        The triggering widget event (not used in the function).
+
+    Returns
+    -------
+    None
     """
     # This line saves the plot as a .png file. Change it to .pdf to save as pdf.
     fig.savefig("plot.png")

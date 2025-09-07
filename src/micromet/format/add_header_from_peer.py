@@ -40,7 +40,27 @@ COMMON_DELIMS = [",", "\t", ";", "|", " "]  # space last (least likely)
 
 
 def open_text(path: Path, encodings: list[str] | None = None) -> io.TextIOWrapper:
-    """Open text file trying a list of encodings until one works."""
+    """
+    Open a text file, trying a list of encodings until one succeeds.
+
+    Parameters
+    ----------
+    path : Path
+        The path to the text file.
+    encodings : list[str], optional
+        A list of character encodings to try, in order.
+        Defaults to ["utf-8-sig", "utf-8", "latin-1"].
+
+    Returns
+    -------
+    io.TextIOWrapper
+        An open file object.
+
+    Raises
+    ------
+    Exception
+        If all attempted encodings fail, the last exception is re-raised.
+    """
     if encodings is None:
         encodings = ["utf-8-sig", "utf-8", "latin-1"]
     last_err = None
@@ -56,7 +76,27 @@ def open_text(path: Path, encodings: list[str] | None = None) -> io.TextIOWrappe
 def detect_delimiter_and_header(
     path: Path, sample_size: int = 64_000
 ) -> Tuple[str, bool]:
-    """Return (delimiter, has_header) using csv.Sniffer with fallbacks."""
+    """
+    Detect the delimiter and presence of a header in a text file.
+
+    Uses `csv.Sniffer` to determine the delimiter and whether a header
+    row exists. Includes fallbacks for both detection steps if the sniffer fails.
+
+    Parameters
+    ----------
+    path : Path
+        The path to the file to inspect.
+    sample_size : int, optional
+        The number of bytes to read from the beginning of the file to use for
+        detection. Defaults to 64,000.
+
+    Returns
+    -------
+    Tuple[str, bool]
+        A tuple containing:
+        - The detected delimiter character (e.g., ',').
+        - A boolean that is True if a header is detected, False otherwise.
+    """
     with open_text(path) as f:
         sample = f.read(sample_size)
     # Default delimiter guess: comma
@@ -85,9 +125,25 @@ def detect_delimiter_and_header(
 
 
 def _fallback_has_header(sample: str, delimiter: str) -> bool:
-    """Basic heuristic when Sniffer fails:
-    - If the first line has alphabetic chars and second line is mostly numeric, assume header exists.
-    - If the first line looks mostly numeric, assume no header.
+    """
+    Apply a fallback heuristic to guess if a sample of text has a header.
+
+    This is used when `csv.Sniffer.has_header` fails. The heuristic is:
+    - If the first line contains alphabetic characters and the second line is
+      mostly numeric, assume a header exists.
+    - If the first line is mostly numeric, assume no header.
+
+    Parameters
+    ----------
+    sample : str
+        A string sample from the beginning of the file.
+    delimiter : str
+        The delimiter used to separate fields.
+
+    Returns
+    -------
+    bool
+        True if the sample is likely to have a header, False otherwise.
     """
     lines = [ln for ln in sample.splitlines() if ln.strip() != ""]
     if len(lines) < 2:
@@ -117,7 +173,22 @@ def _fallback_has_header(sample: str, delimiter: str) -> bool:
 
 
 def count_columns(path: Path, delimiter: str) -> int:
-    """Count number of columns from the first non-empty row."""
+    """
+    Count the number of columns in the first non-empty row of a file.
+
+    Parameters
+    ----------
+    path : Path
+        The path to the file.
+    delimiter : str
+        The delimiter character to use for splitting rows into columns.
+
+    Returns
+    -------
+    int
+        The number of columns detected in the first non-empty row. Returns 0
+        if the file is empty or contains only empty rows.
+    """
     with open_text(path) as f:
         reader = csv.reader(f, delimiter=delimiter)
         for row in reader:
@@ -127,14 +198,45 @@ def count_columns(path: Path, delimiter: str) -> int:
 
 
 def get_first_line_raw(path: Path) -> str:
-    """Return the first line as raw text (without trailing newline)."""
+    """
+    Return the first line of a file as raw text, without trailing newlines.
+
+    Parameters
+    ----------
+    path : Path
+        The path to the file.
+
+    Returns
+    -------
+    str
+        The content of the first line.
+    """
     with open_text(path) as f:
         first = f.readline()
     return first.rstrip("\r\n")
 
 
 def header_line_is_valid(header_line: str, delimiter: str, expected_cols: int) -> bool:
-    """Ensure header splits to expected column count (allow quoted)."""
+    """
+    Check if a header line has the expected number of columns.
+
+    This function properly handles quoted fields.
+
+    Parameters
+    ----------
+    header_line : str
+        The raw header line text.
+    delimiter : str
+        The delimiter character.
+    expected_cols : int
+        The number of columns the header should have.
+
+    Returns
+    -------
+    bool
+        True if the parsed header has the correct number of columns,
+        False otherwise.
+    """
     reader = csv.reader([header_line], delimiter=delimiter)
     try:
         fields = next(reader)
@@ -144,6 +246,23 @@ def header_line_is_valid(header_line: str, delimiter: str, expected_cols: int) -
 
 
 def name_similarity(a: str, b: str) -> float:
+    """
+    Calculate the similarity ratio between two strings.
+
+    Uses `difflib.SequenceMatcher` for the comparison.
+
+    Parameters
+    ----------
+    a : str
+        The first string.
+    b : str
+        The second string.
+
+    Returns
+    -------
+    float
+        A similarity score between 0.0 and 1.0.
+    """
     return SequenceMatcher(None, a, b).ratio()
 
 
@@ -153,9 +272,37 @@ def find_header_donor(
     expected_cols: int,
     min_name_sim: float = 0.4,
 ) -> Optional[Tuple[Path, str]]:
-    """Find a peer file in the same directory with a valid header line that matches expected_cols.
-    Among matches, prefer closest modified date; break ties by highest name similarity.
-    Returns (path_to_donor, donor_header_line) or None if not found.
+    """
+    Find a peer file to serve as a header "donor".
+
+    Searches the same directory as the target file for a suitable file to
+    borrow a header from. A donor is considered suitable if it:
+    - Is a file with a common text extension.
+    - Has a detectable header and the same delimiter.
+    - Has the same number of columns as the target.
+    - Has a filename similarity above `min_name_sim`.
+
+    Among candidates, the one with the closest modification time to the target
+    is chosen. Ties are broken by selecting the one with the highest name
+    similarity.
+
+    Parameters
+    ----------
+    target : Path
+        The path to the file that needs a header.
+    delimiter : str
+        The delimiter used in the target file.
+    expected_cols : int
+        The number of columns in the target file.
+    min_name_sim : float, optional
+        The minimum name similarity ratio (0.0 to 1.0) required for a file
+        to be considered a potential donor. Defaults to 0.4.
+
+    Returns
+    -------
+    Optional[Tuple[Path, str]]
+        A tuple containing the path to the donor file and its raw header line,
+        or None if no suitable donor is found.
     """
     folder = target.parent
     t_mtime = target.stat().st_mtime
@@ -199,7 +346,24 @@ def find_header_donor(
 
 
 def prepend_header_in_place(path: Path, header_line: str) -> None:
-    """Insert header_line at the top of the file (with a newline) preserving file content."""
+    """
+    Insert a header line at the top of a file.
+
+    This function reads the entire file, then writes it back with the
+    provided header line at the beginning. It attempts to preserve the
+    original newline style.
+
+    Parameters
+    ----------
+    path : Path
+        The path to the file to be modified.
+    header_line : str
+        The header line to prepend to the file.
+
+    Returns
+    -------
+    None
+    """
     # Read original content
     with open_text(path) as f:
         original = f.read()

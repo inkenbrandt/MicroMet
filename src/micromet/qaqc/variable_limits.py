@@ -1,3 +1,10 @@
+"""
+This module contains the `limits` dictionary, which defines the expected
+physical and plausible ranges for various meteorological and flux
+variables. The keys of the dictionary are variable names, and the
+values are dictionaries containing metadata such as description, units,
+and min/max values.
+"""
 import numpy as np
 import datetime
 
