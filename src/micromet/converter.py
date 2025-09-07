@@ -48,6 +48,23 @@ def load_yaml(path: Path | str) -> Dict:
 
 
 def logger_check(logger: logging.Logger | None) -> logging.Logger:
+    """
+    Initialize and return a logger instance if none is provided.
+
+    This function checks if a logger object is provided. If not, it
+    creates a new logger with a default warning level and a stream
+    handler that outputs to the console.
+
+    Parameters
+    ----------
+    logger : logging.Logger or None
+        An existing logger instance. If None, a new logger is created.
+
+    Returns
+    -------
+    logging.Logger
+        A configured logger instance.
+    """
     if logger is None:
         logger = logging.getLogger(__name__)
         logger.setLevel(logging.WARNING)
@@ -73,12 +90,9 @@ class AmerifluxDataProcessor:
 
     Parameters
     ----------
-    path : str | Path
-        File path to CSV.
-    config_path : str | Path
-        File path to YAML configuration file for header names. Defaults to 'reformatter_vars.yml'
-    logger : logging.Logger
-        Logger to use.
+    logger : logging.Logger, optional
+        A logger instance to use for logging messages. If not provided,
+        a new default logger will be created.
     """
 
     _TOA5_PREFIX = "TOA5"
@@ -97,7 +111,22 @@ class AmerifluxDataProcessor:
     # Public API
     # --------------------------------------------------------------------- #
     def to_dataframe(self, file: Union[str, Path]) -> pd.DataFrame:
-        """Return parsed CSV as pandas DataFrame."""
+        """
+        Parse a single CSV file into a pandas DataFrame.
+
+        This method first determines the file's header structure and then
+        reads the CSV data, handling specified missing value representations.
+
+        Parameters
+        ----------
+        file : Union[str, Path]
+            The path to the CSV file to be read.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame containing the data from the CSV file.
+        """
         self._determine_header_rows(file)  # type: ignore
         self.logger.debug("Reading %s", file)
         df = pd.read_csv(
@@ -113,10 +142,22 @@ class AmerifluxDataProcessor:
     # --------------------------------------------------------------------- #
     def _determine_header_rows(self, file: Path) -> None:
         """
-        Examine the first line to decide if file is TOA5 or already processed.
+        Examine the file to determine header format and rows to skip.
 
-        TOA5 files begin with literal 'TOA5'.
-        AmeriFlux standard Level‑2 output has no prefix, just column labels.
+        This method inspects the first few lines of a file to identify
+        whether it is in TOA5 format or a standard AmeriFlux format. It
+        sets the `skip_rows` and `names` attributes accordingly for use
+        by `pd.read_csv`.
+
+        Parameters
+        ----------
+        file : Path
+            The path to the file to be inspected.
+
+        Raises
+        ------
+        RuntimeError
+            If the header format is not recognized.
         """
         with file.open("r") as fp:
             first_line = fp.readline().strip().replace('"', "").split(",")
@@ -134,6 +175,23 @@ class AmerifluxDataProcessor:
         self.logger.debug(f"Skip rows for set to {self.skip_rows}")
 
     def _get_file_no(self, file: Path) -> tuple[int, int]:
+        """
+        Extract file and datalogger numbers from a filename.
+
+        This method parses the stem of a filename, assuming a format
+        like 'datalogger_..._filenumber.ext', to extract numeric IDs.
+
+        Parameters
+        ----------
+        file : Path
+            The path to the file.
+
+        Returns
+        -------
+        tuple[int, int]
+            A tuple containing the file number and the datalogger number.
+            Returns (-9999, -9999) if parsing fails.
+        """
         basename = file.stem
 
         try:
@@ -155,21 +213,27 @@ class AmerifluxDataProcessor:
         search_str: str = "*Flux_AmeriFluxFormat*.dat",
     ) -> Optional[pd.DataFrame]:
         """
-        Compiles raw AmeriFlux datalogger files into a single dataframe.
+        Compile raw AmeriFlux datalogger files into a single DataFrame.
+
+        This method searches for files matching a specific pattern within a
+        station's directory, reads each file into a DataFrame, and then
+        concatenates them into a single large DataFrame.
 
         Parameters
         ----------
-        main_dir : str | Path
-            Name of main directory to search for AmeriFlux datalogger files.
-        station_folder_name : str
-            Name of the station folder containing the raw datalogger files.
-        search_str : str
-            String to search for; use asterisk (*) for wildcard.
+        main_dir : Union[str, Path]
+            The main directory containing station folders.
+        station_folder_name : Union[str, Path]
+            The name of the station folder to search within.
+        search_str : str, optional
+            A glob pattern to use for finding files. Defaults to
+            "*Flux_AmeriFluxFormat*.dat".
 
         Returns
         -------
-        pandas.DataFrame or None
-            Dataframe containing compiled AmeriFlux data, or None if no valid files found.
+        Optional[pd.DataFrame]
+            A DataFrame containing the compiled data, or None if no
+            valid files were found.
         """
 
         compiled_data = []
@@ -195,8 +259,19 @@ class AmerifluxDataProcessor:
             self.logger.warning(f"No valid files found in {station_folder}")
             return None
 
-    def iterate_through_stations(self):
-        """Iterate through all stations."""
+    def iterate_through_stations(self) -> None:
+        """
+        Iterate through all predefined stations and compile their data.
+
+        This method uses a hardcoded dictionary of site information to
+        iterate through various stations and data types (met/eddy),
+        compiling the data for each. The compiled data is stored in
+        a dictionary but is not returned.
+
+        Returns
+        -------
+        None
+        """
 
         site_folders = {
             "US-UTD": "Dugout_Ranch",
@@ -266,23 +341,19 @@ class Reformatter:
     """
     Clean and standardize station data.
 
-    Steps (all configurable):
-
-    1. Fix and align timestamps (`_fix_timestamps`).
-    2. Rename columns (`_rename_columns`).
-    3. Remove obvious outliers and redundant columns (`clean_columns`).
-    4. Adjust derived values (`apply_fixes`).
-    5. Optionally, drop extra soil sensor channels (`_drop_extra_soil_columns`).
-    6. Finalize column order and missing value representation.
+    This class provides a pipeline for processing raw station data into a
+    clean, standardized format suitable for analysis.
 
     Parameters
     ----------
-    config_path : str | Path
-        File Path to YAML configuration file governing renames, drops, etc.
-    var_limits_csv : str | Path, optional
-        CSV file containing per‑variable hard min/max limits.
-    drop_soil : bool, default True
-        Whether to remove soil columns deemed redundant (see config).
+    var_limits_csv : str or Path, optional
+        Path to a CSV file containing per-variable min/max limits.
+        If not provided, default limits are used.
+    drop_soil : bool, optional
+        If True, redundant soil-related columns will be dropped.
+        Defaults to True.
+    logger : logging.Logger, optional
+        A logger instance. If not provided, a default one is created.
     """
 
     # SoilVUE Depth/orientation conversion tables --------------------------------
@@ -330,6 +401,28 @@ class Reformatter:
     def prepare(
         self, df: pd.DataFrame, data_type: str = "eddy"
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Execute the full data cleaning and reformatting pipeline.
+
+        This method applies a series of transformations to the input
+        DataFrame, including timestamp fixing, column renaming, outlier
+        removal, and other standardizations.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The raw input DataFrame to be processed.
+        data_type : str, optional
+            The type of data being processed ('eddy' or 'met'), which
+            determines which renaming rules to apply. Defaults to 'eddy'.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, pd.DataFrame]
+            A tuple containing:
+            - The fully processed and cleaned DataFrame.
+            - A report DataFrame summarizing the physical limits applied.
+        """
         self.logger.info("Starting reformat (%s rows)", len(df))
 
         df = (
@@ -354,7 +447,23 @@ class Reformatter:
     # 1. Timestamp handling
     # ------------------------------------------------------------------
     def infer_datetime_col(self, df: pd.DataFrame) -> str | None:
-        """Return the name of the TIMESTAMP column."""
+        """
+        Infer the name of the primary timestamp column in a DataFrame.
+
+        This method searches for common timestamp column names and returns
+        the first one it finds.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The DataFrame to inspect.
+
+        Returns
+        -------
+        str or None
+            The name of the timestamp column, or the name of the first
+            column as a fallback, or None if no columns exist.
+        """
         datetime_col_options = ["TIMESTAMP_START", "TIMESTAMP_START_1"]
         datetime_col_options += [col.lower() for col in datetime_col_options]
         for cand in datetime_col_options:
@@ -366,6 +475,24 @@ class Reformatter:
         return None
 
     def _fix_timestamps(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Convert timestamp columns to datetime objects and handle errors.
+
+        This method identifies the timestamp column, converts it to
+        datetime objects using a standard format, and drops any rows
+        where the conversion fails.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The input DataFrame with a timestamp column.
+
+        Returns
+        -------
+        pd.DataFrame
+            The DataFrame with a new 'datetime_start' column and cleaned
+            timestamps.
+        """
         df = df.copy()
         if "TIMESTAMP" in df.columns:
             df = df.drop(["TIMESTAMP"], axis=1)

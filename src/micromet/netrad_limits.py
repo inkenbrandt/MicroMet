@@ -46,17 +46,57 @@ LATITUDE = 39.5  # Utah average latitude in degrees
 
 
 def solar_declination(doy):
-    """Return solar declination angle in radians for a given day of year."""
+    """
+    Calculate the solar declination angle for a given day of the year.
+
+    Parameters
+    ----------
+    doy : int
+        The day of the year (1-365 or 1-366).
+
+    Returns
+    -------
+    float
+        The solar declination angle in radians.
+    """
     return radians(23.44) * sin(2 * pi * (284 + doy) / 365)
 
 
 def hour_angle(hour):
-    """Return hour angle in radians."""
+    """
+    Calculate the hour angle for a given hour of the day.
+
+    Parameters
+    ----------
+    hour : int
+        The hour of the day (0-23).
+
+    Returns
+    -------
+    float
+        The hour angle in radians.
+    """
     return radians(15 * (hour - 12))
 
 
 def solar_elevation(doy, hour, latitude=LATITUDE):
-    """Return solar elevation angle in degrees."""
+    """
+    Calculate the solar elevation angle.
+
+    Parameters
+    ----------
+    doy : int
+        The day of the year.
+    hour : int
+        The hour of the day.
+    latitude : float, optional
+        The latitude in degrees. Defaults to LATITUDE.
+
+    Returns
+    -------
+    float
+        The solar elevation angle in degrees.
+    """
     decl = solar_declination(doy)
     lat_rad = radians(latitude)
     ha = hour_angle(hour)
@@ -66,7 +106,23 @@ def solar_elevation(doy, hour, latitude=LATITUDE):
 
 
 def clear_sky_radiation(doy, hour, latitude=LATITUDE):
-    """Estimate incoming shortwave radiation under clear-sky conditions."""
+    """
+    Estimate the clear-sky incoming shortwave radiation.
+
+    Parameters
+    ----------
+    doy : int
+        The day of the year.
+    hour : int
+        The hour of the day.
+    latitude : float, optional
+        The latitude in degrees. Defaults to LATITUDE.
+
+    Returns
+    -------
+    float
+        The estimated clear-sky radiation in W/m^2.
+    """
     elev_rad = solar_elevation(doy, hour, latitude)
     if elev_rad <= 0:
         return 0.0
@@ -78,12 +134,38 @@ def clear_sky_radiation(doy, hour, latitude=LATITUDE):
 
 
 def longwave_radiation(T_kelvin):
-    """Estimate longwave radiation using Stefan-Boltzmann law."""
+    """
+    Estimate the longwave radiation using the Stefan-Boltzmann law.
+
+    Parameters
+    ----------
+    T_kelvin : float
+        The temperature in Kelvin.
+
+    Returns
+    -------
+    float
+        The longwave radiation in W/m^2.
+    """
     return EMISSIVITY * STEFAN_BOLTZMANN * T_kelvin**4
 
 
 def estimate_net_radiation_range(doy, hour):
-    """Estimate min/max net radiation for given hour and DOY in Utah."""
+    """
+    Estimate the min/max net radiation for a given hour and day of the year.
+
+    Parameters
+    ----------
+    doy : int
+        The day of the year.
+    hour : int
+        The hour of the day.
+
+    Returns
+    -------
+    tuple[float, float]
+        A tuple containing the minimum and maximum estimated net radiation.
+    """
     rs_down = clear_sky_radiation(doy, hour)
 
     # Net shortwave
@@ -109,6 +191,22 @@ def estimate_net_radiation_range(doy, hour):
 
 
 def add_buffer(min_max: tuple, buffer: float = 100):
+    """
+    Add a buffer to a min/max tuple, with a hard limit for the minimum.
+
+    Parameters
+    ----------
+    min_max : tuple
+        A tuple containing the minimum and maximum values.
+    buffer : float, optional
+        The buffer to add to the max value and subtract from the min
+        value. Defaults to 100.
+
+    Returns
+    -------
+    tuple[float, float]
+        The buffered minimum and maximum values.
+    """
     if min_max[0] - buffer <= -200:
         minv = -200
     else:
@@ -127,6 +225,20 @@ if __name__ == "__main__":
     print(f"Estimated Net Radiation Range: {Rn_min:.1f} W/m² to {Rn_max:.1f} W/m²")
 
     def calc_diurnal_range(doy):
+        """
+        Calculate the diurnal range of net radiation for a given day.
+
+        Parameters
+        ----------
+        doy : int
+            The day of the year.
+
+        Returns
+        -------
+        tuple[list[float], list[float]]
+            A tuple of two lists containing the minimum and maximum net
+            radiation for each hour of the day.
+        """
         hours = np.arange(0, 24)
         rn_min_list, rn_max_list = zip(
             *[estimate_net_radiation_range(doy, h) for h in hours]

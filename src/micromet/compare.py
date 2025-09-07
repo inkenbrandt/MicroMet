@@ -49,7 +49,34 @@ def _to_series(
     index: Optional[pd.DatetimeIndex] = None,
     name: Optional[str] = None,
 ) -> pd.Series:
-    """Coerce input to a pandas Series and normalize missing values."""
+    """
+    Coerce input to a pandas Series and normalize missing values.
+
+    This function takes various array-like or DataFrame inputs and
+    converts them into a pandas Series. It also replaces the sentinel
+    value -9999 with NaN.
+
+    Parameters
+    ----------
+    obj : Union[pd.Series, pd.DataFrame, np.ndarray, Iterable]
+        The input object to be converted to a pandas Series. If a
+        DataFrame, it must have exactly one column.
+    index : Optional[pd.DatetimeIndex], optional
+        The index to use for the new Series. Required if `obj` is a
+        simple iterable or NumPy array. Defaults to None.
+    name : Optional[str], optional
+        The name to assign to the new Series. Defaults to None.
+
+    Returns
+    -------
+    pd.Series
+        The resulting pandas Series with missing values standardized to NaN.
+
+    Raises
+    ------
+    ValueError
+        If a DataFrame with more than one column is provided.
+    """
     if isinstance(obj, pd.Series):
         s = obj.copy()
     elif isinstance(obj, pd.DataFrame):
@@ -78,6 +105,37 @@ def align(
 ) -> pd.DataFrame:
     """
     Align two series on their index and drop rows with NaNs.
+
+    This function prepares two time series for comparison by coercing
+    them to pandas Series, aligning them based on their time index,
+    and removing any rows that contain missing values (NaNs) in
+    either series.
+
+    Parameters
+    ----------
+    x : Union[pd.Series, pd.DataFrame, np.ndarray, Iterable]
+        The first time series (independent variable).
+    y : Union[pd.Series, pd.DataFrame, np.ndarray, Iterable]
+        The second time series (dependent variable).
+    x_index : Optional[pd.DatetimeIndex], optional
+        The time index for the `x` series, if not already a Series or
+        DataFrame. Defaults to None.
+    y_index : Optional[pd.DatetimeIndex], optional
+        The time index for the `y` series, if not already a Series or
+        DataFrame. Defaults to None.
+    x_name : str, optional
+        The name to assign to the `x` series. Defaults to "X".
+    y_name : str, optional
+        The name to assign to the `y` series. Defaults to "Y".
+    how : str, optional
+        The method for joining the two series, as in `pd.concat`.
+        Defaults to "inner".
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame containing the two aligned and cleaned series as
+        columns, indexed by their common time index.
     """
     sx = _to_series(x, index=x_index, name=x_name)
     sy = _to_series(y, index=y_index, name=y_name)
@@ -90,7 +148,24 @@ def fit_linear(
     y: Union[pd.Series, np.ndarray],
 ) -> FitResult:
     """
-    Fit linear model y ~ x using scipy.stats.linregress.
+    Fit a linear model y ~ x using `scipy.stats.linregress`.
+
+    This function performs a simple linear regression and returns the
+    key results, including the fitted values and residuals.
+
+    Parameters
+    ----------
+    x : Union[pd.Series, np.ndarray]
+        The independent variable data (predictor).
+    y : Union[pd.Series, np.ndarray]
+        The dependent variable data (response).
+
+    Returns
+    -------
+    FitResult
+        A dataclass object containing the regression coefficient,
+        intercept, R-squared value, predicted y values (`y_hat`), and
+        the residuals.
     """
     X = np.asarray(x).ravel()
     Y = np.asarray(y).ravel()
@@ -117,6 +192,32 @@ def outlier_mask_from_residuals(
 ) -> np.ndarray:
     """
     Flag outliers from residuals using MAD (robust, default) or STD.
+
+    This function identifies outliers in a set of residuals based on a
+    specified statistical method.
+
+    Parameters
+    ----------
+    residuals : Union[pd.Series, np.ndarray]
+        An array or Series of residuals from a model fit.
+    method : Literal["mad", "std"], optional
+        The method for outlier detection. "mad" (Median Absolute
+        Deviation) is a robust method, while "std" (Standard
+        Deviation) is the standard approach. Defaults to "mad".
+    k : float, optional
+        The number of scaled MADs or standard deviations beyond which a
+        point is considered an outlier. Defaults to 3.0.
+
+    Returns
+    -------
+    np.ndarray
+        A boolean array of the same size as `residuals`, where `True`
+        indicates that the corresponding residual is an outlier.
+
+    Raises
+    ------
+    ValueError
+        If `method` is not "mad" or "std".
     """
     r = np.asarray(residuals).ravel()
 
@@ -156,6 +257,34 @@ def _scatter_with_fit(
     y_label: str,
     point_size: int = 8,
 ) -> None:
+    """
+    Create a scatter plot with a regression line and highlighted outliers.
+
+    This is a helper function for `compare_and_plot`.
+
+    Parameters
+    ----------
+    ax : plt.Axes
+        The matplotlib axes on which to draw the plot.
+    x : pd.Series
+        The data for the x-axis.
+    y : pd.Series
+        The data for the y-axis.
+    fit : FitResult
+        The regression fit results.
+    outliers : np.ndarray
+        A boolean mask indicating the outlier points.
+    x_label : str
+        The label for the x-axis.
+    y_label : str
+        The label for the y-axis.
+    point_size : int, optional
+        The size of the scatter plot points. Defaults to 8.
+
+    Returns
+    -------
+    None
+    """
     ax.scatter(x, y, s=point_size, color="lightgray", alpha=0.7, label="data")
 
     # regression line
@@ -188,6 +317,30 @@ def _timeseries_panel(
     ylabel: str,
     point_size: int = 8,
 ) -> None:
+    """
+    Create a time series plot with highlighted outliers.
+
+    This is a helper function for `compare_and_plot`.
+
+    Parameters
+    ----------
+    ax : plt.Axes
+        The matplotlib axes on which to draw the plot.
+    t : pd.DatetimeIndex
+        The time index for the x-axis.
+    v : pd.Series
+        The time series values for the y-axis.
+    outliers : np.ndarray
+        A boolean mask indicating the outlier points.
+    ylabel : str
+        The label for the y-axis.
+    point_size : int, optional
+        The size of the scatter plot points. Defaults to 8.
+
+    Returns
+    -------
+    None
+    """
     ax.scatter(t, v, s=point_size, color="lightgray", alpha=0.7)
     ax.scatter(
         t[outliers],
@@ -222,7 +375,50 @@ def compare_and_plot(
     point_size: int = 8,
 ) -> Tuple[plt.Figure, dict]:  # type: ignore
     """
-    Align, fit (SciPy), detect outliers, and render three coordinated plots.
+    Align, fit, detect outliers, and render coordinated plots.
+
+    This function provides a comprehensive analysis of the relationship
+    between two time series. It produces a figure with three subplots:
+    1. A scatter plot of y vs. x with a regression line and outliers.
+    2. A time series plot of x with outliers highlighted.
+    3. A time series plot of y with outliers highlighted.
+
+    Parameters
+    ----------
+    x : Union[pd.Series, pd.DataFrame, np.ndarray, Iterable]
+        The first time series (independent variable).
+    y : Union[pd.Series, pd.DataFrame, np.ndarray, Iterable]
+        The second time series (dependent variable).
+    x_index : Optional[pd.DatetimeIndex], optional
+        The time index for `x`. Defaults to None.
+    y_index : Optional[pd.DatetimeIndex], optional
+        The time index for `y`. Defaults to None.
+    x_label : str, optional
+        Label for the x-axis. Defaults to "X".
+    y_label : str, optional
+        Label for the y-axis. Defaults to "Y".
+    title : Optional[str], optional
+        Title for the scatter plot. Defaults to None.
+    method : Literal["mad", "std"], optional
+        Method for outlier detection. Defaults to "mad".
+    k : float, optional
+        Threshold for outlier detection. Defaults to 3.0.
+    join : str, optional
+        Method for aligning the series. Defaults to "inner".
+    point_size : int, optional
+        Size of the scatter plot points. Defaults to 8.
+
+    Returns
+    -------
+    Tuple[plt.Figure, dict]
+        A tuple containing the matplotlib Figure and a dictionary of
+        results, including the aligned data, outlier mask, and fit
+        statistics.
+
+    Raises
+    ------
+    ValueError
+        If there is no overlapping, non-NaN data between the inputs.
     """
     df = align(
         x, y, x_index=x_index, y_index=y_index, x_name=x_label, y_name=y_label, how=join
@@ -283,6 +479,26 @@ def compare_report(
 ) -> pd.DataFrame:
     """
     Return a tidy per-record report with predictions, residuals, and outlier flags.
+
+    This function wraps `compare_and_plot` to generate a detailed
+    DataFrame report for each data point, including the predicted
+    value, residual, and an outlier flag.
+
+    Parameters
+    ----------
+    x : Union[pd.Series, pd.DataFrame, np.ndarray, Iterable]
+        The first time series (independent variable).
+    y : Union[pd.Series, pd.DataFrame, np.ndarray, Iterable]
+        The second time series (dependent variable).
+    **kwargs
+        Additional keyword arguments passed directly to
+        `compare_and_plot`.
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame with columns for the original data, the predicted
+        y-values (`y_hat`), residuals, and a boolean `outlier` flag.
     """
     fig, res = compare_and_plot(x, y, **kwargs)
     df = res["data"].copy()

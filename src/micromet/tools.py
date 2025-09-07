@@ -12,41 +12,36 @@ def find_irr_dates(
     df, swc_col="SWC_1_1_1", do_plot=False, dist=20, height=30, prom=0.6
 ):
     """
-    Detect irrigation events from soil water content time series.
+    Detect irrigation events from a soil water content time series.
 
-    Identifies peaks in soil water content (SWC) data that are likely associated
-    with irrigation events. Detection is based on peak prominence, height, and distance.
-    Optionally plots the full time series with detected events highlighted.
+    This function identifies peaks in soil water content (SWC) data
+    that are likely to be irrigation events, based on their prominence,
+    height, and the distance between them.
 
     Parameters
     ----------
-    df : pandas.DataFrame
-        Input DataFrame containing time-indexed soil water content data.
+    df : pd.DataFrame
+        A DataFrame with a DatetimeIndex containing the SWC data.
     swc_col : str, optional
-        Column name containing soil water content values in percent
-        (not fractional). Default is 'SWC_1_1_1'.
+        The name of the column containing SWC data (in percent).
+        Defaults to 'SWC_1_1_1'.
     do_plot : bool, optional
-        If True, generates a plot showing SWC time series and identified peaks.
-        Default is False.
+        If True, a plot of the SWC time series with the detected
+        irrigation events will be displayed. Defaults to False.
     dist : int, optional
-        Minimum number of time steps between detected peaks. Default is 20.
+        The minimum number of time steps between detected peaks.
+        Defaults to 20.
     height : float, optional
-        Minimum height of peaks to be considered irrigation events. Default is 30 (%).
+        The minimum height of the peaks to be considered irrigation
+        events. Defaults to 30.
     prom : float, optional
-        Minimum prominence of the peaks. Default is 0.6.
+        The minimum prominence of the peaks. Defaults to 0.6.
 
     Returns
     -------
-    dates_of_irr : pandas.DatetimeIndex
-        Timestamps corresponding to detected irrigation events.
-    swc_during_irr : pandas.Series
-        Soil water content values at the detected peaks.
-
-    Notes
-    -----
-    - Only data from April through October (inclusive) is considered as the irrigation season.
-    - Uses `scipy.signal.find_peaks` for peak detection.
-    - Intended for use with SWC data measured in percent, not fractional values.
+    tuple[pd.DatetimeIndex, pd.Series]
+        A tuple containing the dates of the detected irrigation events
+        and the corresponding SWC values.
     """
     df_irr_season = df[df.index.month.isin([4, 5, 6, 7, 8, 9, 10])]
     peaks, _ = find_peaks(
@@ -63,29 +58,30 @@ def find_irr_dates(
 
 def find_gaps(df, columns, missing_value=-9999, min_gap_periods=1):
     """
-    Find gaps in time series data where values are either NaN or equal to missing_value
-    for longer than min_gap_periods.
+    Find and report gaps in time series data.
+
+    This function identifies continuous periods of missing data (either
+    NaN or a specified missing value) in one or more columns of a
+    DataFrame.
 
     Parameters
     ----------
-    df : pandas.DataFrame
-        DataFrame with a time series index of regular frequency.
-    columns : str or list of str
-        Column(s) to check for gaps.
-    missing_value : numeric, default -9999
-        Value to consider as missing data alongside NaN.
-    min_gap_periods : int, default 1
-        Minimum number of consecutive missing periods to be considered a gap.
+    df : pd.DataFrame
+        A DataFrame with a regular time series index.
+    columns : str or list[str]
+        The column(s) to check for gaps.
+    missing_value : numeric, optional
+        A specific value to be treated as missing, in addition to NaN.
+        Defaults to -9999.
+    min_gap_periods : int, optional
+        The minimum number of consecutive missing periods to be
+        considered a gap. Defaults to 1.
 
     Returns
     -------
-    pandas.DataFrame
-        DataFrame containing gap information with columns:
-        - gap_start: start datetime of gap
-        - gap_end: end datetime of gap
-        - duration_hours: duration of gap in hours
-        - missing_records: number of missing records in gap
-        - column: name of column where gap was found
+    pd.DataFrame
+        A DataFrame with information about each detected gap, including
+        start and end times, duration, and the number of missing records.
     """
     if isinstance(columns, str):
         columns = [columns]
@@ -149,15 +145,17 @@ def plot_gaps(gaps_df, title="Time Series Data Gaps"):
 
     Parameters
     ----------
-    gaps_df : pandas.DataFrame
-        DataFrame containing gap information as returned by `find_gaps()`.
-    title : str, default "Time Series Data Gaps"
-        Title for the plot.
+    gaps_df : pd.DataFrame
+        A DataFrame containing gap information, as returned by the
+        `find_gaps` function.
+    title : str, optional
+        The title for the plot. Defaults to "Time Series Data Gaps".
 
     Returns
     -------
-    plotly.graph_objects.Figure
-        Interactive Plotly figure showing gaps as a Gantt chart.
+    go.Figure
+        An interactive Plotly figure showing the data gaps as a Gantt
+        chart.
     """
     if len(gaps_df) == 0:
         print("No gaps found to plot.")
@@ -232,30 +230,37 @@ def detect_extreme_variations(
     min_periods: int = 2,
 ) -> Dict[str, pd.DataFrame]:
     """
-    Detect extreme variations in specified fields of a datetime-indexed DataFrame.
+    Detect extreme variations in time series data.
+
+    This function analyzes one or more fields in a DataFrame to
+    identify points that deviate significantly from the mean within a
+    given time frequency.
 
     Parameters
     ----------
-    df : pandas.DataFrame
-        Input DataFrame with datetime index.
-    fields : str or list of str, optional
-        Column names to analyze. If None, analyzes all numeric columns.
-    frequency : str, default 'D'
-        Frequency to analyze variations over (e.g., 'D' for daily, 'H' for hourly).
-    variation_threshold : float, default 3.0
-        Number of standard deviations beyond which a variation is considered extreme.
-    null_value : float or int, default -9999
-        Value to be treated as null.
-    min_periods : int, default 2
-        Minimum number of valid observations required to calculate variation.
+    df : pd.DataFrame
+        A DataFrame with a DatetimeIndex.
+    fields : str or list[str], optional
+        The column(s) to analyze. If None, all numeric columns are
+        used.
+    frequency : str, optional
+        The frequency at which to group the data for analysis (e.g.,
+        'D' for daily, 'H' for hourly). Defaults to 'D'.
+    variation_threshold : float, optional
+        The number of standard deviations from the mean to be
+        considered an extreme variation. Defaults to 3.0.
+    null_value : float or int, optional
+        A value to be treated as null, in addition to NaN. Defaults
+        to -9999.
+    min_periods : int, optional
+        The minimum number of valid observations required to calculate
+        variation. Defaults to 2.
 
     Returns
     -------
     dict
-        Dictionary with the following keys:
-        - 'variations': DataFrame with calculated variation metrics.
-        - 'extreme_points': DataFrame with boolean flags for extreme values.
-        - 'summary': Summary statistics for each field.
+        A dictionary containing the calculated variations, a boolean
+        DataFrame of extreme points, and a summary of the analysis.
     """
     # Validate input DataFrame
     if not isinstance(df.index, pd.DatetimeIndex):
@@ -327,36 +332,34 @@ def clean_extreme_variations(
     replacement_method: str = "nan",
 ) -> Dict[str, Union[pd.DataFrame, pd.DataFrame]]:
     """
-    Clean extreme variations from specified fields in a DataFrame.
+    Clean extreme variations from time series data.
+
+    This function identifies and replaces extreme values in a DataFrame
+    using one of several methods.
 
     Parameters
     ----------
-    df : pandas.DataFrame
-        Input DataFrame with datetime index.
-    fields : str or list of str, optional
-        Column names to clean. If None, processes all numeric columns.
-    frequency : str, default 'D'
-        Frequency to analyze variations over (e.g., 'D' for daily, 'H' for hourly).
-    variation_threshold : float, default 3.0
-        Number of standard deviations beyond which a variation is considered extreme.
-    null_value : float or int, default -9999
-        Value to be treated as null.
-    min_periods : int, default 2
-        Minimum number of valid observations required to calculate variation.
-    replacement_method : str, default 'nan'
-        Method to handle extreme values:
-        - 'nan': Replace with NaN
-        - 'interpolate': Linear interpolation
-        - 'mean': Replace with frequency mean
-        - 'median': Replace with frequency median
+    df : pd.DataFrame
+        A DataFrame with a DatetimeIndex.
+    fields : str or list[str], optional
+        The column(s) to clean. If None, all numeric columns are used.
+    frequency : str, optional
+        The frequency for analyzing variations. Defaults to 'D'.
+    variation_threshold : float, optional
+        The threshold for detecting extreme variations. Defaults to 3.0.
+    null_value : float or int, optional
+        A value to treat as null. Defaults to -9999.
+    min_periods : int, optional
+        The minimum number of observations for calculation. Defaults to 2.
+    replacement_method : str, optional
+        The method for replacing extreme values ('nan', 'interpolate',
+        'mean', 'median'). Defaults to 'nan'.
 
     Returns
     -------
     dict
-        Dictionary with the following keys:
-        - 'cleaned_data': DataFrame with cleaned data.
-        - 'cleaning_summary': Summary of cleaning operations.
-        - 'removed_points': DataFrame showing removed or replaced values.
+        A dictionary containing the cleaned data, a summary of the
+        cleaning process, and the points that were removed.
     """
     # Validate replacement method
     valid_methods = ["nan", "interpolate", "mean", "median"]
@@ -428,15 +431,22 @@ def clean_extreme_variations(
 
 def polar_to_cartesian_dataframe(df, wd_column="WD", dist_column="Dist"):
     """
-    Convert polar coordinates from a DataFrame to Cartesian coordinates.
+    Convert polar coordinates in a DataFrame to Cartesian coordinates.
 
-    Parameters:
-        df (pd.DataFrame): Input DataFrame containing polar coordinates.
-        wd_column (str): Column name for degrees from north.
-        dist_column (str): Column name for distance from origin.
+    Parameters
+    ----------
+    df : pd.DataFrame
+        A DataFrame containing the polar coordinate data.
+    wd_column : str, optional
+        The name of the column with the wind direction in degrees.
+        Defaults to "WD".
+    dist_column : str, optional
+        The name of the column with the distance. Defaults to "Dist".
 
-    Returns:
-        pd.DataFrame: A DataFrame with added 'X' and 'Y' columns.
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with added 'X' and 'Y' columns.
     """
     # Create copies of the input columns to avoid modifying original data
     wd = df[wd_column].copy()
@@ -469,15 +479,28 @@ def aggregate_to_daily_centroid(
     """
     Aggregate half-hourly coordinate data to daily centroids.
 
-    Parameters:
-        df (pd.DataFrame): DataFrame containing timestamp and coordinates.
-        date_column (str): Column containing datetime values.
-        x_column (str): Column name for X coordinate.
-        y_column (str): Column name for Y coordinate.
-        weighted (bool): Weighted by ET column or not (default: True).
+    This function calculates the daily centroid of a set of coordinates,
+    with an option to weight the calculation by another variable.
 
-    Returns:
-        pd.DataFrame: Aggregated daily centroids.
+    Parameters
+    ----------
+    df : pd.DataFrame
+        A DataFrame with timestamp and coordinate data.
+    date_column : str, optional
+        The name of the column containing the timestamps. Defaults to
+        "Timestamp".
+    x_column : str, optional
+        The name of the column with the X coordinates. Defaults to "X".
+    y_column : str, optional
+        The name of the column with the Y coordinates. Defaults to "Y".
+    weighted : bool, optional
+        If True, the centroid calculation is weighted by the 'ET'
+        column. Defaults to True.
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame with the aggregated daily centroids.
     """
     # Define a lambda function to compute the weighted mean:
     wm = lambda x: np.average(x, weights=df.loc[x.index, "ET"])
@@ -514,9 +537,26 @@ def aggregate_to_daily_centroid(
 
 def compute_Cw(sigma_w, u_star, target=1.25):
     """
-    Compute vertical velocity correction factor C_w so that (C_w*sigma_w)/(sqrt(C_w)*u_star) = target.
-    Uses Eq. (5) from Paw U et al. (2025): Cw = (target/(sigma_w/u_star))^2.
-    If sigma_w/u_star >= target, returns C_w=1 (no correction needed).
+    Compute the vertical velocity correction factor, Cw.
+
+    This function calculates Cw based on the ratio of the standard
+    deviation of vertical velocity (sigma_w) to the friction velocity
+    (u_star), as described by Paw U et al. (2025).
+
+    Parameters
+    ----------
+    sigma_w : float
+        The standard deviation of the vertical velocity.
+    u_star : float
+        The friction velocity.
+    target : float, optional
+        The target ratio for the correction. Defaults to 1.25.
+
+    Returns
+    -------
+    float
+        The calculated correction factor, Cw. Returns 1.0 if no
+        correction is needed.
     """
     ratio = sigma_w / u_star
     if np.isnan(ratio) or np.isclose(u_star, 0):
@@ -530,8 +570,25 @@ def compute_Cw(sigma_w, u_star, target=1.25):
 
 def filter_near_neutral(z_over_L, lower=-0.1, upper=0.0):
     """
-    Return a boolean mask (or filtered array) for near-neutral stability: lower < z/L < upper.
-    Default uses -0.1 < z/L < 0 as in Paw U et al. (2025):contentReference[oaicite:13]{index=13}.
+    Filter for near-neutral atmospheric stability conditions.
+
+    This function returns a boolean mask indicating where the stability
+    parameter z/L falls within a specified range for near-neutral
+    conditions.
+
+    Parameters
+    ----------
+    z_over_L : array_like
+        An array or Series of z/L values.
+    lower : float, optional
+        The lower bound for near-neutral stability. Defaults to -0.1.
+    upper : float, optional
+        The upper bound for near-neutral stability. Defaults to 0.0.
+
+    Returns
+    -------
+    np.ndarray
+        A boolean mask that is True for near-neutral conditions.
     """
     z_over_L = np.asarray(z_over_L, dtype=float)
     mask = (z_over_L >= lower) & (z_over_L < upper)

@@ -1,3 +1,11 @@
+"""
+This module contains the configuration dictionary for the data reformatter.
+
+The `config` dictionary holds several key-value pairs that control the
+behavior of the data reformatting process. This includes mappings for
+renaming columns, lists of variables for different data types (e.g.,
+'eddy' and 'met'), and lists of columns to be dropped.
+"""
 config = {
     "renames_eddy": {
         "ET": "ET_1_1_1",
