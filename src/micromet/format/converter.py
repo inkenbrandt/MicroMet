@@ -29,8 +29,8 @@ import numpy as np
 import yaml
 from importlib.resources import files
 
-import micromet.reformatter_vars as reformatter_vars
-import micromet.variable_limits as variable_limits
+import micromet.format.reformatter_vars as reformatter_vars
+import micromet.qaqc.variable_limits as variable_limits
 
 
 # -----------------------------------------------------------------------------#
@@ -133,7 +133,7 @@ class AmerifluxDataProcessor:
             raise RuntimeError(f"Header line not recognized: {first_line}")
         self.logger.debug(f"Skip rows for set to {self.skip_rows}")
 
-    def _get_file_no(self, file: Path) -> tuple[int, int]:
+    def _get_FILE_NO(self, file: Path) -> tuple[int, int]:
         basename = file.stem
 
         try:
@@ -180,12 +180,12 @@ class AmerifluxDataProcessor:
         for file in station_folder.rglob(search_str):
             self.logger.info(f"Processing file: {file}")
 
-            file_no, datalogger_number = self._get_file_no(file)
+            FILE_NO, datalogger_number = self._get_FILE_NO(file)
 
             df = self.to_dataframe(file)
             if df is not None:
-                df["file_no"] = file_no
-                df["datalogger_no"] = datalogger_number
+                df["FILE_NO"] = FILE_NO
+                df["DATALOGGER_NO"] = datalogger_number
                 compiled_data.append(df)
 
         if compiled_data:
@@ -339,6 +339,7 @@ class Reformatter:
             .pipe(self.set_number_types)
             .pipe(self.resample_timestamps)
             .pipe(self.timestamp_reset)
+            .pipe(self.fill_na_drop_dups)
         )
         df, mask, report = self.apply_physical_limits(df)
         df = self.apply_fixes(df)
@@ -373,40 +374,40 @@ class Reformatter:
         self.logger.debug(f"TS col {ts_col}")
         self.logger.debug(f"TIMESTAMP_START col {df[ts_col][0]}")
         ts_format = "%Y%m%d%H%M"
-        df["datetime_start"] = pd.to_datetime(
+        df["DATETIME_START"] = pd.to_datetime(
             df[ts_col], format=ts_format, errors="coerce"
         )
         self.logger.debug(f"Len of unfixed timestamps {len(df)}")
-        df = df.dropna(subset=["datetime_start"])
+        df = df.dropna(subset=["DATETIME_START"])
         self.logger.debug(f"Len of fixed timestamps {len(df)}")
         return df
 
     def resample_timestamps(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Resample a DataFrame to 30-minute intervals based on the 'datetime_start' column.
+        Resample a DataFrame to 30-minute intervals based on the 'DATETIME_START' column.
 
         The method performs the following steps:
         - Filters out future timestamps beyond the current date.
-        - Removes duplicate entries based on 'datetime_start'.
-        - Sets 'datetime_start' as the index and sorts the DataFrame.
+        - Removes duplicate entries based on 'DATETIME_START'.
+        - Sets 'DATETIME_START' as the index and sorts the DataFrame.
         - Resamples the data to 30-minute intervals using the first valid observation.
         - Linearly interpolates missing values with a maximum gap of one interval.
 
         Parameters
         ----------
         df : pd.DataFrame
-            Input DataFrame containing a 'datetime_start' column of timestamp values.
+            Input DataFrame containing a 'DATETIME_START' column of timestamp values.
 
         Returns
         -------
         pd.DataFrame
-            Resampled and interpolated DataFrame indexed by 'datetime_start'.
+            Resampled and interpolated DataFrame indexed by 'DATETIME_START'.
         """
         today = pd.Timestamp("today").floor("D")
-        df = df[df["datetime_start"] <= today]
+        df = df[df["DATETIME_START"] <= today]
         df = (
-            df.drop_duplicates(subset=["datetime_start"])
-            .set_index("datetime_start")
+            df.drop_duplicates(subset=["DATETIME_START"])
+            .set_index("DATETIME_START")
             .sort_index()
         )
         df = df.resample("30min").first().interpolate(limit=1)
@@ -473,9 +474,11 @@ class Reformatter:
             "renames_eddy" if data_type == "eddy" else "renames_met", {}
         )
         self.logger.debug(f"Renaming columns from {df.columns} to {mapping}")
+        df.columns = df.columns.str.strip()
         df = df.rename(columns=mapping)
         df = self.normalize_prefixes(df)
         df = self.modernize_soil_legacy(df)
+        df.columns = df.columns.str.upper()
         self.logger.debug(f"Len of renamed cols {len(df)}")
         return df
 
@@ -811,6 +814,28 @@ class Reformatter:
 
         return df
 
+    def fill_na_drop_dups(self, df: pd.DataFrame) -> pd.DataFrame:
+        for col in df.columns:
+            if col.endswith(".1"):
+                col1 = col[:-2]
+                col2 = col
+                # Treat -9999 as missing
+                s1 = df[col1].replace(-9999, np.nan)
+                s2 = df[col2].replace(-9999, np.nan)
+                df[col1] = s1.combine_first(s2).fillna(-9999)
+                self.logger.debug(f"Replaced {col1} with {col2}")
+                df = df.drop([col2], axis=1)
+            elif col.endswith(".2"):
+                col1 = col[:-2]
+                col2 = col
+                # Treat -9999 as missing
+                s1 = df[col1].replace(-9999, np.nan)
+                s2 = df[col2].replace(-9999, np.nan)
+                df[col1] = s1.combine_first(s2).fillna(-9999)
+                self.logger.debug(f"Replaced {col1} with {col2}")
+                df = df.drop([col2], axis=1)
+        return df
+
     def ssitc_scale(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Scale SSITC test columns if values exceed expected thresholds.
@@ -1056,7 +1081,7 @@ class Reformatter:
         -----
         - 'MO_LENGTH' and 'RECORD' columns are downcast to integer.
         - 'TIMESTAMP_START', 'TIMESTAMP_END', and 'SSITC' are also downcast to integer.
-        - 'datetime_start' is left unchanged.
+        - 'DATETIME_START' is left unchanged.
         - All other columns are converted to numeric (float) with `errors='coerce'`.
         - Logging reports the number of rows processed.
         """
@@ -1071,12 +1096,12 @@ class Reformatter:
             # Check if the column appears multiple times
             pos = np.where(df.columns == col)[0]
             if len(pos) == 1:
-                if col in ["MO_LENGTH", "RECORD", "file_no", "datalogger_no"]:
+                if col in ["MO_LENGTH", "RECORD", "FILE_NO", "DATALOGGER_NO"]:
                     df[col] = pd.to_numeric(
                         df[col], downcast="integer", errors="coerce"
                     )
 
-                elif col in ["datetime_start"]:
+                elif col in ["DATETIME_START"]:
                     df[col] = df[col]
 
                 elif col in ["TIMESTAMP_START", "TIMESTAMP_END", "SSITC"]:
@@ -1093,8 +1118,8 @@ class Reformatter:
                     if col in [
                         "MO_LENGTH",
                         "RECORD",
-                        "file_no",
-                        "datalogger_no",
+                        "FILE_NO",
+                        "DATALOGGER_NO",
                         "TIMESTAMP_START",
                         "TIMESTAMP_END",
                         "SSITC",
@@ -1102,7 +1127,7 @@ class Reformatter:
                         df.iloc[:, p] = pd.to_numeric(
                             s, downcast="integer", errors="coerce"
                         )
-                    elif col == "datetime_start":
+                    elif col == "DATETIME_START":
                         continue
                     else:
                         df.iloc[:, p] = pd.to_numeric(s, errors="coerce")

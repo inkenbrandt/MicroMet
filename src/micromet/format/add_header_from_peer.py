@@ -326,7 +326,7 @@ def scan(root: Path, min_sim: float = 0.5, backup: bool = False) -> None:
     Examples
     --------
     >>> from pathlib import Path
-    >>> scan(Path("data/"), min_sim=0.65, backup=True)
+    >>> scan(Path("../data/"), min_sim=0.65, backup=True)
     [FIXED] station_log  ← header from station_log_2024.txt
     [SKIP] notes.md: no donor found
     """

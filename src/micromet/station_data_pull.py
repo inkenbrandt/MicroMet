@@ -8,7 +8,7 @@ import pandas as pd
 from io import BytesIO
 import configparser
 import sqlalchemy
-from .converter import Reformatter
+from micromet.format.converter import Reformatter
 from .__init__ import __version__ as micromet_version
 
 
