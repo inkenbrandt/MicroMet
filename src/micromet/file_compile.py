@@ -23,6 +23,21 @@ import time
 
 @dataclass(frozen=True)
 class FileInfo:
+    """
+    A container for file metadata.
+
+    Attributes
+    ----------
+    path : Path
+        The full path to the file.
+    size : int
+        The size of the file in bytes.
+    create_ts : float
+        The creation timestamp of the file. This may be platform-dependent.
+    mtime_ts : float
+        The modification timestamp of the file.
+    """
+
     path: Path
     size: int
     create_ts: float  # "creation" time (platform-dependent, see _get_creation_time)
@@ -31,10 +46,20 @@ class FileInfo:
 
 def _get_creation_time(p: Path) -> float:
     """
-    Best-effort file creation time:
-      - Windows: st_ctime is creation time.
-      - macOS: st_birthtime if available.
-      - Linux: falls back to st_ctime (metadata change time).
+    Get the file creation time in a cross-platform manner.
+
+    This function attempts to get the most accurate creation time
+    available on the current operating system.
+
+    Parameters
+    ----------
+    p : Path
+        The path to the file.
+
+    Returns
+    -------
+    float
+        The creation timestamp of the file.
     """
     st = p.stat()
     if hasattr(st, "st_birthtime"):  # macOS, some BSDs
@@ -43,6 +68,23 @@ def _get_creation_time(p: Path) -> float:
 
 
 def _gather_files(root: Path, contains: str, case_sensitive: bool) -> List[Path]:
+    """
+    Gather all files in a directory tree that contain a specific substring.
+
+    Parameters
+    ----------
+    root : Path
+        The root directory to start the search from.
+    contains : str
+        The substring to search for in filenames.
+    case_sensitive : bool
+        Whether the search should be case-sensitive.
+
+    Returns
+    -------
+    List[Path]
+        A list of paths to the files that match the criteria.
+    """
     files: List[Path] = []
     if not case_sensitive:
         contains_low = contains.lower()
@@ -57,6 +99,21 @@ def _gather_files(root: Path, contains: str, case_sensitive: bool) -> List[Path]
 
 
 def _to_fileinfo(paths: List[Path], use_mtime: bool) -> List[FileInfo]:
+    """
+    Convert a list of file paths to a list of FileInfo objects.
+
+    Parameters
+    ----------
+    paths : List[Path]
+        A list of paths to files.
+    use_mtime : bool
+        If True, use the modification time as the creation time.
+
+    Returns
+    -------
+    List[FileInfo]
+        A list of FileInfo objects corresponding to the input paths.
+    """
     out: List[FileInfo] = []
     for p in paths:
         try:
@@ -75,6 +132,20 @@ def _to_fileinfo(paths: List[Path], use_mtime: bool) -> List[FileInfo]:
 
 
 def _group_by_filename(infos: List[FileInfo]) -> Dict[str, List[FileInfo]]:
+    """
+    Group a list of FileInfo objects by their filename.
+
+    Parameters
+    ----------
+    infos : List[FileInfo]
+        A list of FileInfo objects.
+
+    Returns
+    -------
+    Dict[str, List[FileInfo]]
+        A dictionary mapping each filename to a list of FileInfo objects
+        that share that name.
+    """
     byname: Dict[str, List[FileInfo]] = {}
     for fi in infos:
         byname.setdefault(fi.path.name, []).append(fi)
@@ -82,6 +153,19 @@ def _group_by_filename(infos: List[FileInfo]) -> Dict[str, List[FileInfo]]:
 
 
 def _unique_by_ctime_size(items: List[FileInfo]) -> List[FileInfo]:
+    """
+    Filter a list of FileInfo objects to find unique items by creation time and size.
+
+    Parameters
+    ----------
+    items : List[FileInfo]
+        A list of FileInfo objects to be filtered.
+
+    Returns
+    -------
+    List[FileInfo]
+        A list containing only the unique FileInfo objects.
+    """
     seen: set[Tuple[int, int]] = set()
     unique: List[FileInfo] = []
     # Round timestamps to integer seconds for dedup; adjust if you need finer resolution
@@ -95,8 +179,21 @@ def _unique_by_ctime_size(items: List[FileInfo]) -> List[FileInfo]:
 
 def _all_differ_in_both_ctime_and_size(items: List[FileInfo]) -> bool:
     """
-    Returns True if, across the set, every pair differs in BOTH creation time and size.
-    If any pair shares the same creation time or the same size, returns False.
+    Check if all items in a list differ in both creation time and size.
+
+    Returns True if every pair of items in the list has a different
+    creation time and a different size.
+
+    Parameters
+    ----------
+    items : List[FileInfo]
+        A list of FileInfo objects to compare.
+
+    Returns
+    -------
+    bool
+        True if all items are unique in both creation time and size,
+        False otherwise.
     """
     n = len(items)
     if n <= 1:
@@ -111,10 +208,31 @@ def _all_differ_in_both_ctime_and_size(items: List[FileInfo]) -> bool:
 
 
 def _ensure_outdir(p: Path):
+    """
+    Ensure that a directory exists, creating it if necessary.
+
+    Parameters
+    ----------
+    p : Path
+        The path to the directory.
+    """
     p.mkdir(parents=True, exist_ok=True)
 
 
 def _format_time(ts: float) -> str:
+    """
+    Format a timestamp into a string.
+
+    Parameters
+    ----------
+    ts : float
+        The timestamp to format.
+
+    Returns
+    -------
+    str
+        The formatted time string in 'YYYY-MM-DD_HH-MM-SS' format.
+    """
     return time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime(ts))
 
 
@@ -127,6 +245,35 @@ def compile_files(
     use_mtime: bool = False,
     sequential_zero_pad: int = 1,
 ) -> None:
+    """
+    Compile files from a source directory to a destination, handling duplicates.
+
+    This function scans a directory tree for files containing a specific
+    substring in their names, groups them by filename, and then copies
+    them to an output directory. It includes logic to handle duplicate
+    files based on their creation time and size.
+
+    Parameters
+    ----------
+    root : Path
+        The root directory to search for files.
+    outdir : Path
+        The directory where the compiled files will be saved.
+    contains : str
+        The substring that filenames must contain to be included.
+    case_sensitive : bool, optional
+        If True, the search for `contains` is case-sensitive.
+        Defaults to False.
+    dry_run : bool, optional
+        If True, the function will only print the actions it would take
+        without actually copying any files. Defaults to False.
+    use_mtime : bool, optional
+        If True, use the file's modification time instead of its creation
+        time for comparisons. Defaults to False.
+    sequential_zero_pad : int, optional
+        The number of digits to use for zero-padding when creating
+        sequential filenames for duplicates. Defaults to 1.
+    """
     _ensure_outdir(outdir)
 
     paths = _gather_files(root, contains, case_sensitive)

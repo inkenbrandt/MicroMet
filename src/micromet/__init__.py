@@ -1,3 +1,12 @@
+"""
+Micromet: A Python toolkit for meteorological data processing.
+
+This package provides a collection of modules for working with
+micrometeorological data, including tools for reading, reformatting,
+and analyzing data from Campbell Scientific loggers and other common
+formats. It also includes utilities for plotting and data quality
+control.
+"""
 from .converter import *
 from .tools import *
 from .graphs import *

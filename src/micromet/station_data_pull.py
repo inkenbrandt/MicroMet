@@ -14,13 +14,21 @@ from .__init__ import __version__ as micromet_version
 
 def logger_check(logger: logging.Logger | None) -> logging.Logger:
     """
-    Check if a logger is provided, and if not, create one.
+    Initialize and return a logger instance if none is provided.
 
-    Args:
-        logger: Logger to check
+    This function checks if a logger object is provided. If not, it
+    creates a new logger with a default warning level and a stream
+    handler that outputs to the console.
 
-    Returns:
-        Logger to use
+    Parameters
+    ----------
+    logger : logging.Logger or None
+        An existing logger instance. If None, a new logger is created.
+
+    Returns
+    -------
+    logging.Logger
+        A configured logger instance.
     """
     if logger is None:
         logger = logging.getLogger(__name__)
@@ -53,11 +61,16 @@ class StationDataDownloader:
         logger: logging.Logger = None,
     ):
         """
-        Initialize the StationDataManager with configuration and database engine.
+        Initialize the StationDataManager.
 
-        Args:
-            config: Configuration containing station details and credentials
-            logger: Logger to use for logging messages
+        Parameters
+        ----------
+        config : Union[configparser.ConfigParser, dict]
+            A configuration object containing station details and
+            credentials.
+        logger : logging.Logger, optional
+            A logger for logging messages. If None, a new logger is
+            created.
         """
         self.config = config
         self.logger = logger_check(logger)
@@ -70,12 +83,17 @@ class StationDataDownloader:
         """
         Get the port number for a given station and logger type.
 
-        Args:
-            station: Station identifier
-            loggertype: Type of logger ('eddy' or 'met')
+        Parameters
+        ----------
+        station : str
+            The identifier for the station.
+        loggertype : str, optional
+            The type of logger ('eddy' or 'met'). Defaults to 'eddy'.
 
-        Returns:
-            Port number
+        Returns
+        -------
+        int
+            The port number for the specified station and logger type.
         """
         port_key = f"{loggertype}_port"
         return int(self.config[station].get(port_key, 80))
@@ -84,23 +102,28 @@ class StationDataDownloader:
         self, station: str, loggertype: str = "eddy"
     ) -> Tuple[Optional[str], str]:
         """
-        Retrieve current logger time and system time.
+        Retrieve the current time from the logger and the system.
+
+        This method queries a station's logger for its current time and
+        also gets the current system time for comparison.
 
         Parameters
         ----------
         station : str
-            Station identifier
+            The identifier for the station.
         loggertype : str, optional
-            Type of logger ('eddy' or 'met'), by default 'eddy'
+            The type of logger ('eddy' or 'met'). Defaults to 'eddy'.
 
         Returns
         -------
         Tuple[Optional[str], str]
-            Tuple containing current logger time and system time
+            A tuple containing the logger's current time as a string and
+            the system's current time as a string.
 
         Notes
         -----
-        See https://help.campbellsci.com/crbasic/cr6/Content/Info/webserverapicommands1.htm
+        For more details on the web API commands, see:
+        https://help.campbellsci.com/crbasic/cr6/Content/Info/webserverapicommands1.htm
         """
         ip = self.config[station]["ip"]
         port = self._get_port(station, loggertype)
@@ -122,7 +145,19 @@ class StationDataDownloader:
 
     @staticmethod
     def get_station_id(stationid: str) -> str:
-        """Extract station ID from full station identifier."""
+        """
+        Extract the station ID from a full station identifier string.
+
+        Parameters
+        ----------
+        stationid : str
+            The full station identifier (e.g., 'US-ABC').
+
+        Returns
+        -------
+        str
+            The extracted station ID (e.g., 'ABC').
+        """
         return stationid.split("-")[-1]
 
     def download_from_station(
@@ -134,29 +169,38 @@ class StationDataDownloader:
         p2: str = "0",
     ):
         """
-        Download data from a station.
+        Download data from a station's logger.
+
+        This method constructs a request to the station's web API to
+        download data based on the specified parameters.
 
         Parameters
         ----------
         station : str
-            Station identifier
-        loggertype: str
-            Type of logger ('eddy' or 'met'); default is 'eddy'
-        mode: str
-            Timeframe of the data to be returned ('since-time', 'most-recent', 'since-record', 'date-range', 'Backfill'); default is 'since-time'
-        p1: str
-            String datetime (YYYY-MM-DD T:HH:MM:SS.MS or YYYY-MM-DD) if since-time, or daterange; otherwise # of starting record or backfill interval; default is 0
-        p2: str
-            String datetime (YYYY-MM-DD T:HH:MM:SS.MS or YYYY-MM-DD) if daterange; default is 0
+            The identifier for the station.
+        loggertype : str, optional
+            The type of logger ('eddy' or 'met'). Defaults to 'eddy'.
+        mode : str, optional
+            The data query mode. Can be 'since-time', 'most-recent',
+            'since-record', 'date-range', or 'Backfill'. Defaults to
+            'since-time'.
+        p1 : str, optional
+            The primary parameter for the query, such as a start time
+            or record number. Defaults to "0".
+        p2 : str, optional
+            The secondary parameter for the query, such as an end time.
+            Defaults to "0".
 
         Returns
         -------
-        Tuple[Optional[pd.DataFrame], Optional[float]]
-            Tuple containing downloaded data and data packet size
+        Tuple[Optional[pd.DataFrame], Optional[float], int]
+            A tuple containing the downloaded data as a DataFrame, the
+            size of the data packet in MB, and the HTTP status code.
 
         Notes
         -----
-        See https://help.campbellsci.com/crbasic/cr6/Content/Info/webserverapicommands1.htm
+        For more details on the web API commands, see:
+        https://help.campbellsci.com/crbasic/cr6/Content/Info/webserverapicommands1.htm
         """
 
         ip = self.config[station]["ip"]
@@ -205,6 +249,18 @@ class StationDataProcessor(StationDataDownloader):
         engine: sqlalchemy.engine.base.Engine,
         logger: logging.Logger = None,
     ):
+        """
+        Initialize the StationDataProcessor.
+
+        Parameters
+        ----------
+        config : Union[configparser.ConfigParser, dict]
+            A configuration object with station details.
+        engine : sqlalchemy.engine.base.Engine
+            A SQLAlchemy engine for database connections.
+        logger : logging.Logger, optional
+            A logger for logging messages.
+        """
 
         super().__init__(config, logger)
         self.config = config
@@ -221,18 +277,31 @@ class StationDataProcessor(StationDataDownloader):
         drop_soil: bool = False,
     ) -> Tuple[Optional[pd.DataFrame], Optional[float]]:
         """
-        Fetch and process station data.
+        Fetch and process data for a single station.
 
-        Args:
-            station: Station identifier
-            reformat: Whether to reformat the data
-            loggertype: Logger type ('eddy' or 'met')
-            config_path: Path to reformatter configuration
-            var_limits_csv: Path to extreme values CSV
-            drop_soil: Whether to drop soil data
+        This method downloads data from a station, optionally reformats
+        it, and returns the processed data.
 
-        Returns:
-            Tuple of processed DataFrame and data packet size
+        Parameters
+        ----------
+        station : str
+            The identifier for the station.
+        reformat : bool, optional
+            Whether to reformat the downloaded data. Defaults to True.
+        loggertype : str, optional
+            The type of logger ('eddy' or 'met'). Defaults to 'eddy'.
+        config_path : str, optional
+            The path to the reformatter configuration file.
+        var_limits_csv : str, optional
+            The path to the variable limits CSV file.
+        drop_soil : bool, optional
+            Whether to drop soil-related data. Defaults to False.
+
+        Returns
+        -------
+        Tuple[Optional[pd.DataFrame], Optional[float]]
+            A tuple containing the processed DataFrame and the size of
+            the downloaded data packet in MB.
         """
         last_date = self.get_max_date(station, loggertype)
         raw_data, pack_size, status_code = self.download_from_station(
@@ -267,16 +336,23 @@ class StationDataProcessor(StationDataDownloader):
         logger: logging.Logger = None,
     ) -> pd.DataFrame:
         """
-        Remove existing records from DataFrame.
+        Remove rows from a DataFrame that already exist in the database.
 
-        Args:
-            df: Input DataFrame
-            column_to_check: Column name to check
-            values_to_remove: Values to remove
-            logger: Logger to use for logging messages
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The input DataFrame.
+        column_to_check : str
+            The name of the column to check for existing values.
+        values_to_remove : list
+            A list of values to be removed from the DataFrame.
+        logger : logging.Logger, optional
+            A logger for logging messages.
 
-        Returns:
-            Filtered DataFrame
+        Returns
+        -------
+        pd.DataFrame
+            The DataFrame with existing records removed.
         """
         logger = logger_check(logger)
         column_variations = [
@@ -303,16 +379,23 @@ class StationDataProcessor(StationDataDownloader):
         loggertype: str = "eddy",
     ) -> pd.DataFrame:
         """
-        Compare station data with SQL records and filter new entries.
+        Compare station data with records in the database and filter new entries.
 
-        Args:
-            df: Station data DataFrame
-            station: Station identifier
-            field: Field to compare
-            loggertype: Logger type
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The DataFrame containing the station data.
+        station : str
+            The identifier for the station.
+        field : str, optional
+            The field to use for comparison. Defaults to "timestamp_end".
+        loggertype : str, optional
+            The type of logger ('eddy' or 'met'). Defaults to 'eddy'.
 
-        Returns:
-            Filtered DataFrame
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame containing only the new records.
         """
         table = f"amflux{loggertype}"
         query = f"SELECT {field} FROM {table} WHERE stationid = '{station}';"
@@ -324,19 +407,19 @@ class StationDataProcessor(StationDataDownloader):
 
     def get_max_date(self, station: str, loggertype: str = "eddy") -> datetime.datetime:
         """
-        Get maximum timestamp from station database.
+        Get the maximum timestamp from the station's data in the database.
 
         Parameters
         ----------
         station : str
-            Station identifier
+            The identifier for the station.
         loggertype : str, optional
-            Type of logger ('eddy' or 'met'), by default 'eddy'
+            The type of logger ('eddy' or 'met'). Defaults to 'eddy'.
 
         Returns
         -------
-        int
-            Latest timestamp
+        datetime.datetime
+            The latest timestamp found in the database for the station.
         """
         table = f"amflux{loggertype}"
         query = f"SELECT MAX(timestamp_end) AS max_value FROM {table} WHERE stationid = '{station}';"
@@ -346,13 +429,18 @@ class StationDataProcessor(StationDataDownloader):
 
     def database_columns(self, dat: str) -> list:
         """
-        Get the columns of the database table.
+        Get the list of column names for a given database table.
 
-        Args:
-            dat: Type of data ('eddy' or 'met')
+        Parameters
+        ----------
+        dat : str
+            The type of data ('eddy' or 'met'), which corresponds to
+            the table name.
 
-        Returns:
-            List of column names
+        Returns
+        -------
+        list
+            A list of column names in the specified table.
         """
         table = f"amflux{dat}"
         query = f"SELECT * FROM {table} LIMIT 0;"
@@ -366,10 +454,20 @@ class StationDataProcessor(StationDataDownloader):
         var_limits_csv: str = "./data/extreme_values.csv",
     ) -> None:
         """
-        Process data for all stations.
+        Process and upload data for all specified stations.
 
-        Args:
-            site_folders: Dictionary mapping station IDs to names
+        This method iterates through a dictionary of site folders,
+        fetches data for each station, processes it, and uploads it
+        to the database.
+
+        Parameters
+        ----------
+        site_folders : dict
+            A dictionary mapping station IDs to folder names.
+        config_path : str, optional
+            The path to the reformatter configuration file.
+        var_limits_csv : str, optional
+            The path to the variable limits CSV file.
         """
         for stationid, name in site_folders.items():
             station = self.get_station_id(stationid)
@@ -434,7 +532,33 @@ class StationDataProcessor(StationDataDownloader):
         stationtime: str,
         comptime: str,
     ) -> dict:
-        """Prepare statistics for upload."""
+        """
+        Prepare a dictionary of statistics about the data upload.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The DataFrame being uploaded.
+        stationid : str
+            The identifier for the station.
+        tabletype : str
+            The type of data table.
+        pack_size : float
+            The size of the data packet in MB.
+        raw_len : int
+            The number of rows in the raw data.
+        filtered_len : int
+            The number of rows after filtering.
+        stationtime : str
+            The timestamp from the station's logger.
+        comptime : str
+            The timestamp from the system running the script.
+
+        Returns
+        -------
+        dict
+            A dictionary of upload statistics.
+        """
         return {
             "stationid": stationid,
             "talbetype": tabletype,
@@ -449,7 +573,19 @@ class StationDataProcessor(StationDataDownloader):
         }
 
     def _upload_to_database(self, df: pd.DataFrame, stats: dict, dat: str) -> None:
-        """Upload data and stats to database."""
+        """
+        Upload data and statistics to the database.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The DataFrame to be uploaded.
+        stats : dict
+            A dictionary of statistics to be uploaded.
+        dat : str
+            The type of data ('eddy' or 'met'), used to determine the
+            table name.
+        """
         df.to_sql(f"amflux{dat}", con=self.engine, if_exists="append", index=False)
         pd.DataFrame([stats]).to_sql(
             "uploadstats", con=self.engine, if_exists="append", index=False
@@ -459,7 +595,18 @@ class StationDataProcessor(StationDataDownloader):
     def _print_processing_summary(
         station: str, stats: dict, logger: logging.Logger = None
     ) -> None:
-        """Print processing summary."""
+        """
+        Print a summary of the data processing.
+
+        Parameters
+        ----------
+        station : str
+            The identifier for the station.
+        stats : dict
+            A dictionary of statistics from the processing.
+        logger : logging.Logger, optional
+            A logger for outputting the summary.
+        """
         logger = logger_check(logger)
         logger.info(f"Station {station}")
         logger.info(f"Mindate {stats['mindate']}  Maxdate {stats['maxdate']}")

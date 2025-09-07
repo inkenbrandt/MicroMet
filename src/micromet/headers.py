@@ -13,24 +13,21 @@ def looks_like_header(line: str, alpha_thresh: int = 1) -> bool:
     """
     Heuristically determine if a line appears to be a header.
 
-    This function checks whether the first field in a comma-separated line contains
-    any alphabetic characters. It is intended to distinguish header lines from data
-    lines in structured text files such as instrument logs.
+    This function checks if a line from a text file is likely to be a
+    header row by checking for the presence of alphabetic characters.
 
     Parameters
     ----------
     line : str
-        A single line from a text file, typically the first line.
+        A single line of text from a file.
+    alpha_thresh : int, optional
+        The minimum number of alphabetic fields required to be
+        considered a header. Defaults to 1.
 
     Returns
     -------
     bool
-        True if the line likely represents a header, False otherwise.
-
-    Notes
-    -----
-    This function assumes comma-separated input and does not generalize to other
-    delimiters. It performs a basic check only on the first field.
+        True if the line is likely a header, False otherwise.
     """
     # line_list = line.split(",")
     # return bool(re.search(r"[A-Za-z]", line_list[0]))
@@ -54,32 +51,22 @@ def sniff_delimiter(path: Path, sample_bytes: int = 2048, default: str = ",") ->
     """
     Infer the most likely delimiter used in a text file.
 
-    This function reads a sample of the file and attempts to determine the delimiter
-    using Python's built-in CSV sniffer. If the delimiter cannot be reliably inferred,
-    it falls back to a default value.
+    This function reads a sample from the beginning of a file and uses
+    `csv.Sniffer` to detect the delimiter.
 
     Parameters
     ----------
     path : Path
-        Path to the file whose delimiter is to be inferred.
+        The path to the file.
     sample_bytes : int, optional
-        Number of bytes to read from the beginning of the file for delimiter detection.
-        Default is 2048.
+        The number of bytes to read for the sample. Defaults to 2048.
     default : str, optional
-        Fallback delimiter to use if delimiter inference fails. Default is ",".
+        The delimiter to return if detection fails. Defaults to ",".
 
     Returns
     -------
     str
-        The inferred or fallback delimiter character.
-
-    Raises
-    ------
-    None
-
-    Notes
-    -----
-    Uses `csv.Sniffer` to detect delimiters like commas, tabs, or semicolons.
+        The detected or default delimiter.
     """
     with path.open("r", newline="", encoding="utf-8") as fh:
         sample = fh.read(sample_bytes)
@@ -90,30 +77,38 @@ def sniff_delimiter(path: Path, sample_bytes: int = 2048, default: str = ",") ->
 
 
 def _strip_quotes(tokens: list[str]) -> list[str]:
+    """
+    Remove surrounding quotes from a list of strings.
+
+    Parameters
+    ----------
+    tokens : list[str]
+        A list of strings that may have surrounding quotes.
+
+    Returns
+    -------
+    list[str]
+        The list of strings with quotes removed.
+    """
     return [t.strip('"') for t in tokens]
 
 
 def read_colnames(path: Path) -> list[str]:
     """
-    Read the first line of a file and return column names split by its delimiter.
+    Read column names from the first line of a file.
 
-    This function reads only the first line of the file at `path`, infers the file's
-    delimiter, and splits the line into a list of column names.
+    This function infers the delimiter, reads the first line of the
+    file, and returns the column names.
 
     Parameters
     ----------
     path : Path
-        Path to the file containing a header row.
+        The path to the file.
 
     Returns
     -------
-    list of str
-        List of column names extracted from the first line of the file.
-
-    Notes
-    -----
-    This function assumes the first line contains a valid header and relies on
-    `sniff_delimiter` to determine the appropriate delimiter.
+    list[str]
+        A list of column names.
     """
     delim = sniff_delimiter(path)
     # with path.open(encoding="utf-8") as fh:
@@ -131,28 +126,25 @@ def patch_file(
     target: Path,
 ) -> pd.DataFrame:
     """
-    Copy a header from a donor file and apply it to a target file.
+    Apply a header from a donor file to a target file.
 
-    This function reads column headers from the `donor` file and applies them to the
-    `target` file, which is assumed to lack a header row. The resulting data is
-    returned as a pandas DataFrame. Optionally, the target file is overwritten
-    with the fixed version, and a `.bak` backup of the original is saved.
+    This function reads the header from a `donor` file and applies it
+    to a `target` file that is assumed to be missing a header. The
+    modified data is returned as a DataFrame and written back to the
+    target file.
 
     Parameters
     ----------
     donor : Path
-        Path to the file that contains a valid header row.
+        The path to the file with the correct header.
     target : Path
-        Path to the file that is missing a header.
+        The path to the file that needs a header.
 
     Returns
     -------
-    pandas.DataFrame
-        DataFrame containing the contents of `target` with headers applied from `donor`.
-
-    Notes
-    -----
-    The delimiter is automatically inferred from the donor file.
+    pd.DataFrame
+        A DataFrame containing the data from the target file with the
+        new header.
     """
     cols = read_colnames(donor)
     delim = sniff_delimiter(donor)
