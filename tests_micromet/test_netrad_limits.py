@@ -4,7 +4,7 @@ import pytest
 from datetime import datetime
 import pytz
 
-from src.micromet.netrad_limits import (
+from micromet.qaqc.netrad_limits import (
     solar_declination,
     hour_angle,
     solar_elevation,

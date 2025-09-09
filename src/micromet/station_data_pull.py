@@ -8,8 +8,9 @@ import pandas as pd
 from io import BytesIO
 import configparser
 import sqlalchemy
-from micromet.format.converter import Reformatter
-from .__init__ import __version__ as micromet_version
+from micromet.format.reformatter import Reformatter
+
+micromet_version = "0.2.1"
 
 
 def logger_check(logger: logging.Logger | None) -> logging.Logger:
