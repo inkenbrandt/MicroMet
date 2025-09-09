@@ -14,14 +14,11 @@ import plotly.graph_objects as go
 import os
 import sys
 
-sys.path.append("../src")
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 # tests/test_station_data_pull.py
 
 from micromet.station_data_pull import StationDataDownloader, StationDataProcessor
-from micromet import graphs
-
-from micromet import tools
+from micromet.report import graphs
+from micromet.report import tools
 # ------------------------------------------------------------------ #
 #  Generic fixtures
 # ------------------------------------------------------------------ #

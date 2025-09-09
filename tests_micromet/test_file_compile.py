@@ -2,7 +2,7 @@ import os
 import time
 from pathlib import Path
 import pytest
-from src.micromet.file_compile import compile_files, _gather_files, _to_fileinfo, _group_by_filename, _unique_by_ctime_size, _all_differ_in_both_ctime_and_size, FileInfo
+from micromet.format.file_compile import compile_files, _gather_files, _to_fileinfo, _group_by_filename, _unique_by_ctime_size, _all_differ_in_both_ctime_and_size, FileInfo
 
 @pytest.fixture
 def temp_dir_structure(tmp_path):
