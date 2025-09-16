@@ -16,8 +16,9 @@ def logger_check(logger: logging.Logger | None) -> logging.Logger:
 
     Parameters
     ----------
-    logger : logging.Logger or None
+    logger : logging.Logger or None, optional
         An existing logger instance. If None, a new logger is created.
+        Defaults to None.
 
     Returns
     -------
@@ -47,34 +48,24 @@ def energy_sankey(df, date_text="2024-06-19 12:00", logger: logging.Logger = Non
     Create a Sankey diagram of energy balance for a specific time.
 
     This function generates a Sankey diagram to visualize the flow of
-    energy components in a system. It is typically used in
-    meteorological or environmental studies.
+    energy components in a system, such as incoming and outgoing
+    radiation, and heat fluxes.
 
     Parameters
     ----------
     df : pd.DataFrame
         A DataFrame with a DatetimeIndex and columns for energy
-        components: 'SW_IN', 'LW_IN', 'SW_OUT', 'LW_OUT', 'NETRAD',
-        'G', 'LE', 'H'.
+        components like 'SW_IN', 'LW_IN', 'NETRAD', 'G', 'LE', 'H'.
     date_text : str, optional
-        The date and time for which to plot the energy balance, in a
-        format recognized by `pd.to_datetime`. Defaults to
-        "2024-06-19 12:00".
+        The date and time for which to plot the energy balance.
+        Defaults to "2024-06-19 12:00".
     logger : logging.Logger, optional
-        A logger for outputting debug information. If None, a default
-        logger is created.
+        A logger for outputting debug information. Defaults to None.
 
     Returns
     -------
     go.Figure
         A Plotly Figure object containing the Sankey diagram.
-
-    Notes
-    -----
-    The energy balance ratio (EBR) is calculated as:
-    (H + LE) / (NETRAD - G)
-    The residual term is computed as:
-    NETRAD - (G + H + LE)
     """
     select_date = pd.to_datetime(date_text)
     swi = df.loc[select_date, "SW_IN"]
@@ -157,29 +148,17 @@ def scatterplot_instrument_comparison(edmet, compare_dict, station, logger: logg
     edmet : pd.DataFrame
         A DataFrame with a DatetimeIndex containing the measurement data.
     compare_dict : dict
-        A dictionary mapping the instrument column names to their
-        metadata (variable, label, units).
+        A dictionary mapping instrument column names to their metadata.
     station : str
         The identifier for the station, used in the plot title.
     logger : logging.Logger, optional
-        A logger for outputting regression statistics.
+        A logger for outputting regression statistics. Defaults to None.
 
     Returns
     -------
-    slope : float
-        The slope of the linear regression line.
-    intercept : float
-        The intercept of the linear regression line.
-    r_squared : float
-        The R-squared value of the regression.
-    p_value : float
-        The p-value of the regression.
-    std_err : float
-        The standard error of the regression estimate.
-    fig : plt.Figure
-        The matplotlib Figure object.
-    ax : plt.Axes
-        The matplotlib Axes object.
+    tuple
+        A tuple containing the slope, intercept, R-squared, p-value,
+        standard error, and the matplotlib Figure and Axes objects.
     """
     # Compare two instruments
     instruments = list(compare_dict.keys())
@@ -233,6 +212,9 @@ def mean_squared_error(series1: pd.Series, series2: pd.Series) -> float:
     """
     Calculate the Mean Squared Error (MSE) between two series.
 
+    MSE is a measure of the average squared difference between the
+    estimated values and the actual value.
+
     Parameters
     ----------
     series1 : pd.Series
@@ -279,28 +261,21 @@ def mean_diff_plot(
     m2 : array_like
         A 1-D array of measurements.
     sd_limit : float, optional
-        The number of standard deviations to use for the limits of
-        agreement. Defaults to 1.96 (for 95% confidence).
+        The number of standard deviations for the limits of agreement.
+        Defaults to 1.96.
     ax : plt.Axes, optional
-        An existing matplotlib Axes to draw the plot on. If None, a
-        new figure and axes are created.
+        An existing matplotlib Axes to draw the plot on. Defaults to None.
     scatter_kwds : dict, optional
-        Keyword arguments for the scatter plot.
+        Keyword arguments for the scatter plot. Defaults to None.
     mean_line_kwds : dict, optional
-        Keyword arguments for the mean difference line.
+        Keyword arguments for the mean difference line. Defaults to None.
     limit_lines_kwds : dict, optional
-        Keyword arguments for the limits of agreement lines.
+        Keyword arguments for the limits of agreement lines. Defaults to None.
 
     Returns
     -------
     plt.Figure
         The matplotlib Figure object.
-
-    References
-    ----------
-    Bland, J. M., & Altman, D. G. (1986). Statistical methods for
-    assessing agreement between two methods of clinical measurement.
-    The lancet, 327(8476), 307-310.
     """
     fig, ax = plt.subplots(figsize=(10, 8))
 
@@ -396,14 +371,12 @@ def bland_alt_plot(edmet, compare_dict, station, alpha=0.5, logger: logging.Logg
     alpha : float, optional
         The transparency level for the plot elements. Defaults to 0.5.
     logger : logging.Logger, optional
-        A logger for outputting statistics.
+        A logger for outputting statistics. Defaults to None.
 
     Returns
     -------
-    f : plt.Figure
-        The matplotlib Figure object.
-    ax : plt.Axes
-        The matplotlib Axes object.
+    tuple[plt.Figure, plt.Axes]
+        A tuple containing the matplotlib Figure and Axes objects.
     """
     # Compare two instruments
     instruments = list(compare_dict.keys())
@@ -458,7 +431,7 @@ def bland_alt_plot(edmet, compare_dict, station, alpha=0.5, logger: logging.Logg
 # Example of filtering by date range
 def plot_timeseries_daterange(
     input_df, selected_station, selected_field, start_date, end_date
-):
+) -> None:
     """
     Plot a time series for a specific station and variable over a date range.
 
@@ -468,7 +441,7 @@ def plot_timeseries_daterange(
     Parameters
     ----------
     input_df : pd.DataFrame
-        A DataFrame with a MultiIndex (station, timestamp).
+        A DataFrame with a MultiIndex ('station', 'timestamp').
     selected_station : str
         The identifier of the station to plot.
     selected_field : str
@@ -477,11 +450,6 @@ def plot_timeseries_daterange(
         The start date of the time range.
     end_date : str or pd.Timestamp
         The end date of the time range.
-
-    Returns
-    -------
-    None
-        This function displays a plot but does not return any objects.
     """
     global fig, ax
     # ax.clear()
@@ -504,7 +472,7 @@ def plot_timeseries_daterange(
     plt.show()
 
 
-def save_plot(b):
+def save_plot(b) -> None:
     """
     Save the current matplotlib figure to a file.
 
@@ -515,10 +483,6 @@ def save_plot(b):
     ----------
     b : object
         The triggering widget event (not used in the function).
-
-    Returns
-    -------
-    None
     """
     # This line saves the plot as a .png file. Change it to .pdf to save as pdf.
     fig.savefig("plot.png")

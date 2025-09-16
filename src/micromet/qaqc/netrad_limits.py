@@ -49,6 +49,9 @@ def solar_declination(doy):
     """
     Calculate the solar declination angle for a given day of the year.
 
+    The solar declination is the angle between the Earth's equatorial
+    plane and the line connecting the centers of the Earth and the Sun.
+
     Parameters
     ----------
     doy : int
@@ -65,6 +68,9 @@ def solar_declination(doy):
 def hour_angle(hour):
     """
     Calculate the hour angle for a given hour of the day.
+
+    The hour angle is the angular displacement of the Sun east or west
+    of the local meridian due to Earth's rotation.
 
     Parameters
     ----------
@@ -83,6 +89,8 @@ def solar_elevation(doy, hour, latitude=LATITUDE):
     """
     Calculate the solar elevation angle.
 
+    The solar elevation angle is the angle of the Sun above the horizon.
+
     Parameters
     ----------
     doy : int
@@ -95,7 +103,7 @@ def solar_elevation(doy, hour, latitude=LATITUDE):
     Returns
     -------
     float
-        The solar elevation angle in degrees.
+        The solar elevation angle in radians.
     """
     decl = solar_declination(doy)
     lat_rad = radians(latitude)
@@ -108,6 +116,10 @@ def solar_elevation(doy, hour, latitude=LATITUDE):
 def clear_sky_radiation(doy, hour, latitude=LATITUDE):
     """
     Estimate the clear-sky incoming shortwave radiation.
+
+    This function provides a simplified estimation of the incoming shortwave
+    radiation on a clear day, taking into account the solar constant,
+    Earth-Sun distance, and atmospheric transmissivity.
 
     Parameters
     ----------
@@ -137,15 +149,18 @@ def longwave_radiation(T_kelvin):
     """
     Estimate the longwave radiation using the Stefan-Boltzmann law.
 
+    This function calculates the longwave radiation emitted by a surface
+    based on its temperature, using the Stefan-Boltzmann law.
+
     Parameters
     ----------
     T_kelvin : float
-        The temperature in Kelvin.
+        The temperature of the surface in Kelvin.
 
     Returns
     -------
     float
-        The longwave radiation in W/m^2.
+        The estimated longwave radiation in W/m^2.
     """
     return EMISSIVITY * STEFAN_BOLTZMANN * T_kelvin**4
 
@@ -153,6 +168,10 @@ def longwave_radiation(T_kelvin):
 def estimate_net_radiation_range(doy, hour):
     """
     Estimate the min/max net radiation for a given hour and day of the year.
+
+    This function calculates a plausible range for net radiation by
+    estimating the components of the radiation budget (shortwave and
+    longwave radiation) under typical conditions.
 
     Parameters
     ----------
@@ -164,7 +183,8 @@ def estimate_net_radiation_range(doy, hour):
     Returns
     -------
     tuple[float, float]
-        A tuple containing the minimum and maximum estimated net radiation.
+        A tuple containing the minimum and maximum estimated net radiation
+        in W/m^2.
     """
     rs_down = clear_sky_radiation(doy, hour)
 
@@ -192,7 +212,10 @@ def estimate_net_radiation_range(doy, hour):
 
 def add_buffer(min_max: tuple, buffer: float = 100):
     """
-    Add a buffer to a min/max tuple, with a hard limit for the minimum.
+    Add a buffer to a min/max tuple, with a hard lower limit.
+
+    This function expands a range defined by a min/max tuple by adding
+    a buffer. The minimum value is not allowed to go below -200.
 
     Parameters
     ----------
@@ -228,6 +251,9 @@ if __name__ == "__main__":
         """
         Calculate the diurnal range of net radiation for a given day.
 
+        This function calculates the estimated minimum and maximum net
+        radiation for each hour of a given day of the year.
+
         Parameters
         ----------
         doy : int
@@ -236,8 +262,9 @@ if __name__ == "__main__":
         Returns
         -------
         tuple[list[float], list[float]]
-            A tuple of two lists containing the minimum and maximum net
-            radiation for each hour of the day.
+            A tuple of two lists, where the first list contains the
+            minimum net radiation for each hour and the second list
+            contains the maximum.
         """
         hours = np.arange(0, 24)
         rn_min_list, rn_max_list = zip(
@@ -250,7 +277,28 @@ if __name__ == "__main__":
 
 
 def _infer_freq_minutes(dt: pd.DatetimeIndex) -> int:
-    """Infer sampling interval in whole minutes from a DatetimeIndex."""
+    """
+    Infer the sampling interval in whole minutes from a DatetimeIndex.
+
+    This function calculates the median difference between consecutive
+    timestamps in a DatetimeIndex and returns the result in whole minutes.
+
+    Parameters
+    ----------
+    dt : pd.DatetimeIndex
+        The DatetimeIndex from which to infer the frequency.
+
+    Returns
+    -------
+    int
+        The inferred sampling interval in minutes.
+
+    Raises
+    ------
+    ValueError
+        If the index contains fewer than two timestamps or if the
+        inferred interval is not positive.
+    """
     diffs = np.diff(dt.view("i8"))  # nanoseconds
     if len(diffs) == 0:
         raise ValueError("Need at least two timestamps to infer frequency.")
@@ -267,21 +315,26 @@ def _to_local_standard_time(
     assume_naive_is_local: bool = False,
 ) -> pd.DatetimeIndex:
     """
-    Convert timestamps to 'local standard time' (no DST) using a fixed UTC offset.
+    Convert timestamps to local standard time (no DST) using a fixed UTC offset.
+
+    This function takes a DatetimeIndex and converts it to a fixed-offset
+    timezone, effectively removing any daylight saving time adjustments.
 
     Parameters
     ----------
-    dt : DatetimeIndex
-        Input timestamps; may be tz-naive or tz-aware.
+    dt : pd.DatetimeIndex
+        Input timestamps, which can be timezone-naive or timezone-aware.
     std_utc_offset_hours : float
-        UTC offset for local standard time, e.g., -7 for US Mountain Standard Time.
-    assume_naive_is_local : bool
-        If True and dt is tz-naive, treat it as already in local standard time.
-        If False, localize naive timestamps to UTC before converting.
+        The UTC offset for the local standard time (e.g., -7 for MST).
+    assume_naive_is_local : bool, optional
+        If True and the input is timezone-naive, it is assumed to be in
+        local standard time. If False, it is assumed to be in UTC.
+        Defaults to False.
 
     Returns
     -------
-    DatetimeIndex localized to a fixed-offset tz (no DST).
+    pd.DatetimeIndex
+        A DatetimeIndex localized to a fixed-offset timezone (no DST).
     """
     offset = pd.Timedelta(hours=std_utc_offset_hours)
     fixed_tz = pytz.FixedOffset(int(offset.total_seconds() // 60))
@@ -305,27 +358,33 @@ def sw_in_pot_noaa(
     std_utc_offset_hours: float,
 ) -> pd.Series:
     """
-    Compute top-of-atmosphere shortwave irradiance on a horizontal surface (W m^-2)
-    using NOAA's solar position approximations.
+    Compute top-of-atmosphere shortwave irradiance using NOAA's approximations.
 
-    Assumptions
-    -----------
-    - dt_local_standard must be in *local standard time* (fixed UTC offset, no DST).
-    - Returns 0 at night (i.e., when cos(zenith) <= 0).
-    - Uses a variable Earth-Sun distance correction.
+    This function calculates the potential incoming shortwave radiation
+    at the top of the atmosphere on a horizontal surface, using solar
+    position approximations from NOAA.
 
     Parameters
     ----------
-    dt_local_standard : DatetimeIndex
-        Local standard time (no DST). Must be tz-aware with a fixed offset.
-    lat_deg, lon_deg : float
-        Latitude (+N) and longitude (+E) in degrees.
+    dt_local_standard : pd.DatetimeIndex
+        A DatetimeIndex in local standard time (fixed UTC offset, no DST).
+    lat_deg : float
+        Latitude in degrees (positive for Northern Hemisphere).
+    lon_deg : float
+        Longitude in degrees (positive for Eastern Hemisphere).
     std_utc_offset_hours : float
-        Local standard time UTC offset (e.g., -7 for MST).
+        The local standard time UTC offset (e.g., -7 for MST).
 
     Returns
     -------
-    pd.Series of SW_IN_POT in W m^-2, index=dt_local_standard
+    pd.Series
+        A Series of potential incoming shortwave radiation (W/m^2),
+        indexed by the input DatetimeIndex.
+
+    Raises
+    ------
+    ValueError
+        If the input DatetimeIndex is not timezone-aware.
     """
     if dt_local_standard.tz is None:
         raise ValueError("dt_local_standard must be tz-aware fixed-offset (no DST).")
@@ -395,6 +454,42 @@ def sw_in_pot_noaa(
 
 @dataclass
 class WindowComposite:
+    """
+    A container for the results of a 15-day window analysis.
+
+    This dataclass holds the composite data and statistical results for a
+    single 15-day analysis window.
+
+    Attributes
+    ----------
+    year : int
+        The year of the analysis window.
+    window_id : int
+        The 15-day window number within the year.
+    step_minutes : int
+        The sampling interval in minutes.
+    steps_per_day : int
+        The number of time steps per day.
+    comp_pot : np.ndarray
+        The maximum diurnal composite for potential incoming shortwave radiation.
+    comp_sw : np.ndarray, optional
+        The maximum diurnal composite for observed shortwave radiation.
+    comp_ppfd : np.ndarray, optional
+        The maximum diurnal composite for observed PPFD.
+    pct_exceed_sw : float, optional
+        The percentage of time the observed SW composite exceeds the potential.
+    pct_exceed_ppfd : float, optional
+        The percentage of time the observed PPFD composite exceeds the potential.
+    lag_sw : int, optional
+        The lag (in time steps) at which the SW cross-correlation is maximized.
+    corr_sw : float, optional
+        The maximum cross-correlation for shortwave radiation.
+    lag_ppfd : int, optional
+        The lag (in time steps) at which the PPFD cross-correlation is maximized.
+    corr_ppfd : float, optional
+        The maximum cross-correlation for PPFD.
+    """
+
     year: int
     window_id: int
     step_minutes: int
@@ -417,16 +512,21 @@ def _max_diurnal_composite(
     """
     Build a 'maximum diurnal composite' over a 15-day window.
 
+    This function calculates the maximum value for each time slot of the
+    day over a 15-day period, creating a composite diurnal cycle.
+
     Parameters
     ----------
     s : pd.Series
-        Values with a DateTimeIndex in local standard time.
+        A Series of values with a DatetimeIndex in local standard time.
     step_minutes : int
-        Sampling interval in minutes.
+        The sampling interval in minutes.
 
     Returns
     -------
-    np.ndarray of length steps_per_day with the per-slot maximum.
+    np.ndarray
+        An array of length `steps_per_day` containing the maximum value
+        for each time slot.
     """
     steps_per_day = int(round(1440 / step_minutes))
     # Slot index within day [0 .. steps_per_day-1]
@@ -443,13 +543,26 @@ def _xcorr_best_lag(
     a: np.ndarray, b: np.ndarray, max_lag: int
 ) -> Tuple[Optional[int], Optional[float]]:
     """
-    Find lag (in steps) of maximum Pearson correlation between a and b.
+    Find the lag of maximum Pearson correlation between two arrays.
 
-    NaNs are ignored pairwise for each lag.
+    This function calculates the Pearson correlation between two arrays at
+    different lags (from -max_lag to +max_lag) and returns the lag that
+    results in the highest correlation.
+
+    Parameters
+    ----------
+    a : np.ndarray
+        The first array.
+    b : np.ndarray
+        The second array.
+    max_lag : int
+        The maximum lag (in steps) to check in each direction.
 
     Returns
     -------
-    (best_lag, best_corr) or (None, None) if insufficient finite data.
+    tuple[Optional[int], Optional[float]]
+        A tuple containing the best lag and the corresponding correlation,
+        or (None, None) if there is insufficient data.
     """
     best_lag, best_corr = None, None
     for lag in range(-max_lag, max_lag + 1):
@@ -472,7 +585,19 @@ def _xcorr_best_lag(
 
 
 def _fifteen_day_window_id(doy: int) -> int:
-    """1-based 15-day window number within a year."""
+    """
+    Calculate the 1-based 15-day window number for a given day of the year.
+
+    Parameters
+    ----------
+    doy : int
+        The day of the year (1-365 or 1-366).
+
+    Returns
+    -------
+    int
+        The 15-day window number (1-25).
+    """
     return 1 + (doy - 1) // 15
 
 
@@ -492,39 +617,46 @@ def analyze_timestamp_alignment(
     max_lag_steps: int = 6,
 ) -> Tuple[pd.DataFrame, Dict[Tuple[int, int], WindowComposite]]:
     """
-    Main analysis routine.
+    Perform the main timestamp alignment analysis.
+
+    This function analyzes the timestamp alignment of radiation data by
+    comparing observed values against potential top-of-atmosphere radiation.
+    It computes composites, cross-correlations, and other statistics for
+    15-day windows.
 
     Parameters
     ----------
-    df : DataFrame
-        Should include timestamps and at least SW_IN (W m^-2). PPFD_IN (umol m^-2 s^-1)
-        is optional. Timestamps can be provided via:
-        - `time_col` (single datetime-like column), OR
-        - AmeriFlux-style integer strings `TIMESTAMP_START`/`TIMESTAMP_END`.
-    lat, lon : float
-        Site latitude (+N) and longitude (+E).
+    df : pd.DataFrame
+        The input DataFrame containing timestamp and radiation data.
+    lat : float
+        Latitude of the site.
+    lon : float
+        Longitude of the site.
     std_utc_offset_hours : float
-        Local standard time UTC offset (no DST), e.g., -7 for MST.
-    time_from : {"CENTER","START","END"}
-        If using START/END, choose how to interpret the timestamp for alignment:
-        - "CENTER": midpoint of the averaging period (recommended),
-        - "START": use start time,
-        - "END": use end time.
-    start_col, end_col, time_col : str or None
-        Column names per above.
-    sw_col, ppfd_col : str
-        Column names for observed SW_IN and PPFD_IN if available.
-    assume_naive_is_local : bool
-        See _to_local_standard_time docstring.
-    max_lag_steps : int
-        Maximum lag (in steps) for cross-correlation search.
+        The UTC offset for local standard time.
+    time_from : str, optional
+        How to interpret the timestamp ('CENTER', 'START', 'END').
+        Defaults to 'CENTER'.
+    start_col : str, optional
+        Name of the start timestamp column. Defaults to 'TIMESTAMP_START'.
+    end_col : str, optional
+        Name of the end timestamp column. Defaults to 'TIMESTAMP_END'.
+    time_col : str, optional
+        Name of a single datetime column. Defaults to None.
+    sw_col : str, optional
+        Name of the shortwave radiation column. Defaults to 'SW_IN'.
+    ppfd_col : str, optional
+        Name of the PPFD column. Defaults to 'PPFD_IN'.
+    assume_naive_is_local : bool, optional
+        Whether to assume naive timestamps are in local time. Defaults to False.
+    max_lag_steps : int, optional
+        Maximum lag for cross-correlation. Defaults to 6.
 
     Returns
     -------
-    summary_df : DataFrame
-        One row per (year, window_id) with %exceed and xcorr/lag stats.
-    composites : dict[(year,window_id)->WindowComposite]
-        Composites and stats for plotting.
+    tuple[pd.DataFrame, dict]
+        A tuple containing a summary DataFrame of the analysis and a
+        dictionary of WindowComposite objects for each window.
     """
     # 1) Build DateTimeIndex
     idx = None
@@ -661,11 +793,22 @@ def analyze_timestamp_alignment(
 
 def flag_issues(summary: pd.DataFrame) -> Dict[str, str]:
     """
-    Apply simple heuristics to suggest likely issues.
+    Apply simple heuristics to flag likely timestamp and data quality issues.
 
-    Notes
-    -----
-    - For 30-min data: 2 steps ~ 1 hour, 1 step ~ 30 minutes (AmeriFlux guidance).
+    This function uses a set of heuristics to identify potential issues
+    such as timezone mismatches, DST usage, and sensor problems based on
+    the summary of the timestamp alignment analysis.
+
+    Parameters
+    ----------
+    summary : pd.DataFrame
+        A DataFrame containing the summary of the timestamp alignment analysis.
+
+    Returns
+    -------
+    dict[str, str]
+        A dictionary of flagged issues, where keys are issue types and
+        values are descriptive messages.
     """
     notes = {}
 
@@ -736,16 +879,28 @@ def plot_summary(
     outfile_prefix: Optional[str] = None,
 ):
     """
-    Create summary plots:
-      (A) % exceedance per 15-day window,
-      (B) best lag (steps) per 15-day window,
-      (C) overlay of composites for the 'worst' window (max |lag| or % exceed).
+    Create and display summary plots of the timestamp alignment analysis.
 
-    Saves PNGs if `outfile_prefix` is given; also shows the figures.
+    This function generates a set of plots to visualize the results of the
+    timestamp alignment analysis, including percent exceedance, lag times,
+    and a composite overlay for the "worst" window.
+
+    Parameters
+    ----------
+    summary : pd.DataFrame
+        A DataFrame containing the summary of the analysis.
+    composites : dict
+        A dictionary of WindowComposite objects for each analysis window.
+    which_year : int, optional
+        The year to plot. If None, all years are plotted. Defaults to None.
+    outfile_prefix : str, optional
+        A prefix for the output plot filenames. If provided, plots are
+        saved to files. Defaults to None.
 
     Returns
     -------
-    dict with figure handles.
+    dict
+        A dictionary of matplotlib Figure handles for the generated plots.
     """
     figs = {}
     data = summary.copy()

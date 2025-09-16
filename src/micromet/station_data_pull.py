@@ -53,7 +53,26 @@ def logger_check(logger: logging.Logger | None) -> logging.Logger:
 
 class StationDataDownloader:
     """
-    A class to manage station data operations including fetching, processing, and database interactions.
+    A class to manage downloading data from a station's logger.
+
+    This class handles the connection and data download from a Campbell
+    Scientific data logger via its web API.
+
+    Parameters
+    ----------
+    config : configparser.ConfigParser or dict
+        A configuration object containing station details and credentials.
+    logger : logging.Logger, optional
+        A logger for logging messages. If None, a new logger is created.
+
+    Attributes
+    ----------
+    config : configparser.ConfigParser or dict
+        The configuration object.
+    logger : logging.Logger
+        The logger instance.
+    logger_credentials : requests.auth.HTTPBasicAuth
+        The authentication credentials for the logger.
     """
 
     def __init__(
@@ -62,11 +81,11 @@ class StationDataDownloader:
         logger: logging.Logger = None,
     ):
         """
-        Initialize the StationDataManager.
+        Initialize the StationDataDownloader.
 
         Parameters
         ----------
-        config : Union[configparser.ConfigParser, dict]
+        config : configparser.ConfigParser or dict
             A configuration object containing station details and
             credentials.
         logger : logging.Logger, optional
@@ -117,14 +136,9 @@ class StationDataDownloader:
 
         Returns
         -------
-        Tuple[Optional[str], str]
+        tuple[str | None, str]
             A tuple containing the logger's current time as a string and
             the system's current time as a string.
-
-        Notes
-        -----
-        For more details on the web API commands, see:
-        https://help.campbellsci.com/crbasic/cr6/Content/Info/webserverapicommands1.htm
         """
         ip = self.config[station]["ip"]
         port = self._get_port(station, loggertype)
@@ -182,26 +196,20 @@ class StationDataDownloader:
         loggertype : str, optional
             The type of logger ('eddy' or 'met'). Defaults to 'eddy'.
         mode : str, optional
-            The data query mode. Can be 'since-time', 'most-recent',
-            'since-record', 'date-range', or 'Backfill'. Defaults to
-            'since-time'.
+            The data query mode ('since-time', 'most-recent', etc.).
+            Defaults to 'since-time'.
         p1 : str, optional
-            The primary parameter for the query, such as a start time
-            or record number. Defaults to "0".
+            The primary parameter for the query (e.g., start time).
+            Defaults to "0".
         p2 : str, optional
-            The secondary parameter for the query, such as an end time.
+            The secondary parameter for the query (e.g., end time).
             Defaults to "0".
 
         Returns
         -------
-        Tuple[Optional[pd.DataFrame], Optional[float], int]
+        tuple[pd.DataFrame | None, float | None, int]
             A tuple containing the downloaded data as a DataFrame, the
             size of the data packet in MB, and the HTTP status code.
-
-        Notes
-        -----
-        For more details on the web API commands, see:
-        https://help.campbellsci.com/crbasic/cr6/Content/Info/webserverapicommands1.htm
         """
 
         ip = self.config[station]["ip"]
@@ -244,6 +252,28 @@ class StationDataDownloader:
 
 
 class StationDataProcessor(StationDataDownloader):
+    """
+    A class for processing and managing station data.
+
+    This class extends `StationDataDownloader` to add functionality for
+    reformatting data, interacting with a database, and managing the
+    overall data processing workflow.
+
+    Parameters
+    ----------
+    config : configparser.ConfigParser or dict
+        A configuration object with station details.
+    engine : sqlalchemy.engine.base.Engine
+        A SQLAlchemy engine for database connections.
+    logger : logging.Logger, optional
+        A logger for logging messages.
+
+    Attributes
+    ----------
+    engine : sqlalchemy.engine.base.Engine
+        The SQLAlchemy engine instance.
+    """
+
     def __init__(
         self,
         config: Union[configparser.ConfigParser, dict],
@@ -255,7 +285,7 @@ class StationDataProcessor(StationDataDownloader):
 
         Parameters
         ----------
-        config : Union[configparser.ConfigParser, dict]
+        config : configparser.ConfigParser or dict
             A configuration object with station details.
         engine : sqlalchemy.engine.base.Engine
             A SQLAlchemy engine for database connections.
@@ -300,7 +330,7 @@ class StationDataProcessor(StationDataDownloader):
 
         Returns
         -------
-        Tuple[Optional[pd.DataFrame], Optional[float]]
+        tuple[pd.DataFrame | None, float | None]
             A tuple containing the processed DataFrame and the size of
             the downloaded data packet in MB.
         """
@@ -348,7 +378,7 @@ class StationDataProcessor(StationDataDownloader):
         values_to_remove : list
             A list of values to be removed from the DataFrame.
         logger : logging.Logger, optional
-            A logger for logging messages.
+            A logger for logging messages. Defaults to None.
 
         Returns
         -------
@@ -467,8 +497,10 @@ class StationDataProcessor(StationDataDownloader):
             A dictionary mapping station IDs to folder names.
         config_path : str, optional
             The path to the reformatter configuration file.
+            Defaults to "./data/reformatter_vars.yml".
         var_limits_csv : str, optional
             The path to the variable limits CSV file.
+            Defaults to "./data/extreme_values.csv".
         """
         for stationid, name in site_folders.items():
             station = self.get_station_id(stationid)
@@ -606,7 +638,7 @@ class StationDataProcessor(StationDataDownloader):
         stats : dict
             A dictionary of statistics from the processing.
         logger : logging.Logger, optional
-            A logger for outputting the summary.
+            A logger for outputting the summary. Defaults to None.
         """
         logger = logger_check(logger)
         logger.info(f"Station {station}")

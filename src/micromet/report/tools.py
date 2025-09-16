@@ -23,8 +23,7 @@ def find_irr_dates(
     df : pd.DataFrame
         A DataFrame with a DatetimeIndex containing the SWC data.
     swc_col : str, optional
-        The name of the column containing SWC data (in percent).
-        Defaults to 'SWC_1_1_1'.
+        The name of the column containing SWC data. Defaults to 'SWC_1_1_1'.
     do_plot : bool, optional
         If True, a plot of the SWC time series with the detected
         irrigation events will be displayed. Defaults to False.
@@ -68,11 +67,10 @@ def find_gaps(df, columns, missing_value=-9999, min_gap_periods=1):
     ----------
     df : pd.DataFrame
         A DataFrame with a regular time series index.
-    columns : str or list[str]
+    columns : str or list of str
         The column(s) to check for gaps.
     missing_value : numeric, optional
-        A specific value to be treated as missing, in addition to NaN.
-        Defaults to -9999.
+        A specific value to be treated as missing. Defaults to -9999.
     min_gap_periods : int, optional
         The minimum number of consecutive missing periods to be
         considered a gap. Defaults to 1.
@@ -143,6 +141,10 @@ def plot_gaps(gaps_df, title="Time Series Data Gaps"):
     """
     Create a Gantt chart visualization of gaps in time series data.
 
+    This function takes a DataFrame of gap information and creates a
+    Gantt chart to visualize the duration and timing of data gaps for
+    different variables.
+
     Parameters
     ----------
     gaps_df : pd.DataFrame
@@ -153,9 +155,9 @@ def plot_gaps(gaps_df, title="Time Series Data Gaps"):
 
     Returns
     -------
-    go.Figure
-        An interactive Plotly figure showing the data gaps as a Gantt
-        chart.
+    go.Figure or None
+        An interactive Plotly figure showing the data gaps, or None if
+        there are no gaps to plot.
     """
     if len(gaps_df) == 0:
         print("No gaps found to plot.")
@@ -240,18 +242,17 @@ def detect_extreme_variations(
     ----------
     df : pd.DataFrame
         A DataFrame with a DatetimeIndex.
-    fields : str or list[str], optional
+    fields : str or list of str, optional
         The column(s) to analyze. If None, all numeric columns are
-        used.
+        used. Defaults to None.
     frequency : str, optional
-        The frequency at which to group the data for analysis (e.g.,
-        'D' for daily, 'H' for hourly). Defaults to 'D'.
+        The frequency for grouping data (e.g., 'D' for daily).
+        Defaults to 'D'.
     variation_threshold : float, optional
         The number of standard deviations from the mean to be
         considered an extreme variation. Defaults to 3.0.
     null_value : float or int, optional
-        A value to be treated as null, in addition to NaN. Defaults
-        to -9999.
+        A value to be treated as null. Defaults to -9999.
     min_periods : int, optional
         The minimum number of valid observations required to calculate
         variation. Defaults to 2.
@@ -341,8 +342,9 @@ def clean_extreme_variations(
     ----------
     df : pd.DataFrame
         A DataFrame with a DatetimeIndex.
-    fields : str or list[str], optional
+    fields : str or list of str, optional
         The column(s) to clean. If None, all numeric columns are used.
+        Defaults to None.
     frequency : str, optional
         The frequency for analyzing variations. Defaults to 'D'.
     variation_threshold : float, optional
@@ -487,8 +489,8 @@ def aggregate_to_daily_centroid(
     df : pd.DataFrame
         A DataFrame with timestamp and coordinate data.
     date_column : str, optional
-        The name of the column containing the timestamps. Defaults to
-        "Timestamp".
+        The name of the column containing the timestamps.
+        Defaults to "Timestamp".
     x_column : str, optional
         The name of the column with the X coordinates. Defaults to "X".
     y_column : str, optional
@@ -541,7 +543,7 @@ def compute_Cw(sigma_w, u_star, target=1.25):
 
     This function calculates Cw based on the ratio of the standard
     deviation of vertical velocity (sigma_w) to the friction velocity
-    (u_star), as described by Paw U et al. (2025).
+    (u_star).
 
     Parameters
     ----------
@@ -556,7 +558,7 @@ def compute_Cw(sigma_w, u_star, target=1.25):
     -------
     float
         The calculated correction factor, Cw. Returns 1.0 if no
-        correction is needed.
+        correction is needed, or NaN if the ratio is invalid.
     """
     ratio = sigma_w / u_star
     if np.isnan(ratio) or np.isclose(u_star, 0):
