@@ -6,6 +6,7 @@ behavior of the data reformatting process. This includes mappings for
 renaming columns, lists of variables for different data types (e.g.,
 'eddy' and 'met'), and lists of columns to be dropped.
 """
+
 config = {
     "renames_eddy": {
         "ET": "ET_1_1_1",
@@ -309,6 +310,7 @@ config = {
         "T_1_6_1": "TS_3_6_1",
         "T_1_7_1": "TS_3_7_1",
         "T_1_8_1": "TS_3_8_1",
+        "T__1_8_1": "TS_3_8_1",
         "T_1_9_1": "TS_3_9_1",
         "BulkEC_1_1_1": "EC_3_1_1",
         "BulkEC_1_2_1": "EC_3_2_1",
