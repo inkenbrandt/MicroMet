@@ -33,7 +33,27 @@ _PREFIX_PATTERNS: Dict[re.Pattern[str], str] = {
 
 
 def infer_datetime_col(df: pd.DataFrame, logger: logging.Logger) -> str | None:
-    """Return the name of the TIMESTAMP column."""
+    """
+    Infer the name of the timestamp column in a DataFrame.
+
+    This function searches for a timestamp column in the DataFrame by
+    checking a list of common names (e.g., 'TIMESTAMP_START'). If a
+    matching column is found, its name is returned. Otherwise, it logs
+    a warning and returns the name of the first column.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The DataFrame to search for a timestamp column.
+    logger : logging.Logger
+        The logger to use for warning messages.
+
+    Returns
+    -------
+    str or None
+        The name of the timestamp column if found, otherwise the name of
+        the first column.
+    """
     datetime_col_options = ["TIMESTAMP_START", "TIMESTAMP_START_1"]
     datetime_col_options += [col.lower() for col in datetime_col_options]
     for cand in datetime_col_options:
@@ -44,6 +64,24 @@ def infer_datetime_col(df: pd.DataFrame, logger: logging.Logger) -> str | None:
 
 
 def fix_timestamps(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
+    """
+    Convert the timestamp column to datetime objects and handle missing values.
+
+    This function identifies the timestamp column, converts it to datetime
+    objects, and removes any rows where the timestamp could not be parsed.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame with a timestamp column.
+    logger : logging.Logger
+        The logger for tracking progress and warnings.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with a 'DATETIME_START' column of datetime objects.
+    """
     df = df.copy()
     if "TIMESTAMP" in df.columns:
         df = df.drop(["TIMESTAMP"], axis=1)
@@ -65,7 +103,23 @@ def fix_timestamps(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
 
 def resample_timestamps(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     """
-    Resample a DataFrame to 30-minute intervals based on the 'DATETIME_START' column.
+    Resample a DataFrame to 30-minute intervals.
+
+    This function resamples the DataFrame to a fixed 30-minute frequency
+    based on the 'DATETIME_START' column. It also handles duplicate
+    timestamps and interpolates missing data.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame with a 'DATETIME_START' column.
+    logger : logging.Logger
+        The logger for tracking progress.
+
+    Returns
+    -------
+    pd.DataFrame
+        The resampled DataFrame with a 30-minute frequency index.
     """
     today = pd.Timestamp("today").floor("D")
     df = df[df["DATETIME_START"] <= today]
@@ -82,6 +136,23 @@ def resample_timestamps(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFram
 def timestamp_reset(df, minutes=30):
     """
     Reset TIMESTAMP_START and TIMESTAMP_END columns based on the DataFrame index.
+
+    This function generates new 'TIMESTAMP_START' and 'TIMESTAMP_END' columns
+    based on the DataFrame's datetime index. The 'TIMESTAMP_END' is calculated
+    by adding a specified number of minutes to the start time.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame with a datetime index.
+    minutes : int, optional
+        The number of minutes to add to the start time to calculate the
+        end time. Defaults to 30.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with updated 'TIMESTAMP_START' and 'TIMESTAMP_END' columns.
     """
     df["TIMESTAMP_START"] = df.index.strftime("%Y%m%d%H%M").astype(int)
     df["TIMESTAMP_END"] = (
@@ -94,7 +165,28 @@ def timestamp_reset(df, minutes=30):
 
 def rename_columns(df: pd.DataFrame, data_type: str, config: dict, logger: logging.Logger) -> pd.DataFrame:
     """
-    Rename DataFrame columns based on configuration and standardize column names.
+    Rename DataFrame columns based on configuration and standardize their names.
+
+    This function renames columns using a predefined mapping from the
+    configuration, normalizes soil and temperature-related prefixes,
+    and converts all column names to uppercase.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame with columns to be renamed.
+    data_type : str
+        The type of data ('eddy' or 'met'), which determines which
+        renaming map to use.
+    config : dict
+        The configuration dictionary containing the renaming maps.
+    logger : logging.Logger
+        The logger for tracking the renaming process.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with renamed and standardized column names.
     """
     mapping = config.get(
         "renames_eddy" if data_type == "eddy" else "renames_met", {}
@@ -111,7 +203,23 @@ def rename_columns(df: pd.DataFrame, data_type: str, config: dict, logger: loggi
 
 def normalize_prefixes(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     """
-    Normalize column name prefixes related to soil and temperature measurements.
+    Normalize column name prefixes for soil and temperature measurements.
+
+    This function standardizes column name prefixes by renaming them based
+    on a set of predefined patterns. For example, it can change 'BulkEC_'
+    to 'EC_'.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame with columns to be normalized.
+    logger : logging.Logger
+        The logger for tracking the normalization process.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with normalized column name prefixes.
     """
     rename_map: Dict[str, str] = {}
     for col in df.columns:
@@ -132,6 +240,22 @@ def normalize_prefixes(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame
 def modernize_soil_legacy(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     """
     Update legacy soil sensor column names to a standardized format.
+
+    This function identifies and renames legacy soil sensor columns to a
+    modern, standardized format based on predefined mapping rules for
+    depth and orientation.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame with legacy soil sensor column names.
+    logger : logging.Logger
+        The logger for tracking the modernization process.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with updated soil sensor column names.
     """
     rename_map: Dict[str, str] = {}
     for col in df.columns:
@@ -163,7 +287,34 @@ def apply_physical_limits(
     return_mask: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame | None, pd.DataFrame]:
     """
-    Apply physical Min/Max bounds to columns.
+    Apply physical Min/Max bounds to columns in a DataFrame.
+
+    This function applies physical limits (minimum and maximum) to the columns
+    of a DataFrame. It can either mask out-of-bounds values with NaN or clip
+    them to the limits.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame to which the limits will be applied.
+    how : str, optional
+        The method to use for applying limits: 'mask' (default) or 'clip'.
+    inplace : bool, optional
+        If True, modify the DataFrame in place. Defaults to False.
+    prefer_longest_key : bool, optional
+        If True, prefer longer matching keys from the limits dictionary.
+        Defaults to True.
+    return_mask : bool, optional
+        If True, return a boolean mask of the values that were flagged.
+        Defaults to False.
+
+    Returns
+    -------
+    tuple[pd.DataFrame, pd.DataFrame | None, pd.DataFrame]
+        A tuple containing:
+        - The DataFrame with physical limits applied.
+        - A boolean mask of flagged values (if `return_mask` is True).
+        - A report summarizing the number of flagged values for each column.
     """
     if how not in {"mask", "clip"}:
         raise ValueError("how must be 'mask' or 'clip'")
@@ -243,6 +394,22 @@ def apply_physical_limits(
 def apply_fixes(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     """
     Apply a set of minor, variable-specific data corrections.
+
+    This function serves as a pipeline for applying several small, targeted
+    fixes to the data, such as correcting 'TAU' values, converting soil
+    water content to percent, and scaling SSITC test values.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame to be fixed.
+    logger : logging.Logger
+        The logger for tracking the fixes being applied.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with all fixes applied.
     """
     df = tau_fixer(df)
     df = fix_swc_percent(df, logger)
@@ -253,6 +420,20 @@ def apply_fixes(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
 def tau_fixer(df: pd.DataFrame) -> pd.DataFrame:
     """
     Replace zero values in the 'TAU' column with NaN.
+
+    This function checks for zero values in the 'TAU' column and replaces
+    them with NaN. This is often done to handle cases where zero represents
+    a missing or invalid measurement.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame with a 'TAU' column.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with zero values in 'TAU' replaced by NaN.
     """
     if "TAU" in df.columns and "U_STAR" in df.columns:
         bad_idx = df["TAU"] == 0
@@ -262,7 +443,23 @@ def tau_fixer(df: pd.DataFrame) -> pd.DataFrame:
 
 def fix_swc_percent(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     """
-    Convert fractional soil water content values to percent if applicable.
+    Convert fractional soil water content (SWC) values to percentages.
+
+    This function checks soil water content columns (those starting with
+    'SWC_') and, if the values appear to be fractional (<= 1.5),
+    multiplies them by 100 to convert them to percentages.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame with SWC columns.
+    logger : logging.Logger
+        The logger for tracking the conversion process.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with SWC values converted to percentages where applicable.
     """
     df = df.copy()
 
@@ -285,6 +482,25 @@ def fix_swc_percent(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
 
 
 def fill_na_drop_dups(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
+    """
+    Fill missing values in primary columns with data from duplicate columns, then drop the duplicates.
+
+    This function identifies duplicate columns (e.g., 'COLUMN.1', 'COLUMN.2'),
+    uses them to fill missing values in the primary column ('COLUMN'), and
+    then removes the duplicate columns.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame with duplicate columns.
+    logger : logging.Logger
+        The logger for tracking the fill and drop process.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with missing values filled and duplicate columns removed.
+    """
     for col in df.columns:
         if col.endswith(".1"):
             col1 = col[:-2]
@@ -307,7 +523,23 @@ def fill_na_drop_dups(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
 
 def ssitc_scale(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     """
-    Scale SSITC test columns if values exceed expected thresholds.
+    Scale SSITC (Signal Strength and Integrity Test) columns.
+
+    This function checks specific SSITC columns and, if their values
+    exceed a certain threshold (3), applies a scaling and rating
+    transformation to them.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame with SSITC columns.
+    logger : logging.Logger
+        The logger for tracking the scaling process.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with SSITC columns scaled where applicable.
     """
     ssitc_columns = [
         "FC_SSITC_TEST",
@@ -327,7 +559,20 @@ def ssitc_scale(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
 
 def scale_and_convert(column: pd.Series) -> pd.Series:
     """
-    Apply a rating transformation and convert values to float.
+    Apply a rating transformation and convert the column to float type.
+
+    This function applies a 'rating' function to each element of the
+    Series and then converts the entire Series to float.
+
+    Parameters
+    ----------
+    column : pd.Series
+        The input Series to be transformed.
+
+    Returns
+    -------
+    pd.Series
+        The transformed and converted Series.
     """
     column = column.apply(rating)
     return column
@@ -335,7 +580,22 @@ def scale_and_convert(column: pd.Series) -> pd.Series:
 
 def rating(x):
     """
-    Categorize a numeric value into a discrete rating level.
+    Categorize a numeric value into a discrete rating level (0, 1, or 2).
+
+    This function categorizes a numeric value into one of three levels:
+    - 0 for values between 0 and 3.
+    - 1 for values between 4 and 6.
+    - 2 for all other values.
+
+    Parameters
+    ----------
+    x : numeric or None
+        The input value to be rated.
+
+    Returns
+    -------
+    int
+        The rating level (0, 1, or 2).
     """
     if x is None:
         x = 0
@@ -351,7 +611,24 @@ def rating(x):
 
 def drop_extra_soil_columns(df: pd.DataFrame, config: dict, logger: logging.Logger) -> pd.DataFrame:
     """
-    Drop redundant or unused soil probe columns.
+    Drop redundant or unused soil-related columns from the DataFrame.
+
+    This function identifies and removes soil-related columns that are
+    considered extra or redundant based on the provided configuration.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame with soil-related columns.
+    config : dict
+        The configuration dictionary containing lists of columns to drop.
+    logger : logging.Logger
+        The logger for tracking the column dropping process.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with extra soil columns removed.
     """
     df = df.copy()
     math_soils: Sequence[str] = config.get("math_soils_v2", [])
@@ -384,7 +661,21 @@ def drop_extra_soil_columns(df: pd.DataFrame, config: dict, logger: logging.Logg
 
 def make_unique(cols):
     """
-    Make column names unique by appending numeric suffixes to duplicates.
+    Make a list of column names unique by appending numeric suffixes to duplicates.
+
+    This function takes a list of column names and ensures that all names
+    are unique by appending a numeric suffix (e.g., '.1', '.2') to any
+    duplicate names.
+
+    Parameters
+    ----------
+    cols : list
+        A list of column names.
+
+    Returns
+    -------
+    list
+        A list of unique column names.
     """
     seen = {}
     out = []
@@ -400,7 +691,23 @@ def make_unique(cols):
 
 
 def make_unique_cols(df: pd.DataFrame) -> pd.DataFrame:
-    """Return a copy with duplicate column names suffixed .1, .2, ..."""
+    """
+    Ensure that all column names in a DataFrame are unique.
+
+    This function uses the `make_unique` helper function to append numeric
+    suffixes to any duplicate column names, ensuring that every column
+    has a unique identifier.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame.
+
+    Returns
+    -------
+    pd.DataFrame
+        A copy of the DataFrame with unique column names.
+    """
     df = df.copy()
     df.columns = make_unique(df.columns)
     return df
@@ -408,7 +715,23 @@ def make_unique_cols(df: pd.DataFrame) -> pd.DataFrame:
 
 def set_number_types(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     """
-    Convert columns in the DataFrame to numeric types where appropriate.
+    Convert columns in a DataFrame to the appropriate numeric types.
+
+    This function iterates through the columns of a DataFrame and converts
+    them to numeric types (integer or float) where appropriate. It handles
+    special cases for certain columns and logs warnings for duplicate columns.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame.
+    logger : logging.Logger
+        The logger for tracking the type conversion process.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with columns converted to numeric types.
     """
     logger.debug(f"Setting number types: {df.head(3)}")
     dupes = pd.Series(df.columns).value_counts()
@@ -457,13 +780,43 @@ def set_number_types(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
 def drop_extras(df: pd.DataFrame, config: dict) -> pd.DataFrame:
     """
     Drop extra or unwanted columns from the DataFrame based on configuration.
+
+    This function removes columns from the DataFrame that are listed in the
+    'drop_cols' section of the configuration dictionary.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame.
+    config : dict
+        The configuration dictionary containing the list of columns to drop.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with the specified columns removed.
     """
     return df.drop(columns=config.get("drop_cols", []), errors="ignore")
 
 
 def col_order(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     """
-    Reorder DataFrame columns to place priority columns first.
+    Reorder DataFrame columns to place priority columns at the beginning.
+
+    This function moves specified columns ('TIMESTAMP_END', 'TIMESTAMP_START')
+    to the front of the DataFrame for better readability and consistency.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame.
+    logger : logging.Logger
+        The logger for tracking the reordering process.
+
+    Returns
+    -------
+    pd.DataFrame
+        The DataFrame with columns reordered.
     """
     first_cols = ["TIMESTAMP_END", "TIMESTAMP_START"]
     for col in first_cols:
