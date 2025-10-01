@@ -122,9 +122,10 @@ class Reformatter:
         df = df.pipe(transformers.timestamp_reset)
         df = df.pipe(transformers.fill_na_drop_dups, logger=self.logger)
 
+        df = df.pipe(transformers.apply_fixes, logger=self.logger)
         df, mask, report = transformers.apply_physical_limits(df)
 
-        df = df.pipe(transformers.apply_fixes, logger=self.logger)
+        
 
         if self.drop_soil:
             df = df.pipe(transformers.drop_extra_soil_columns, config=self.config, logger=self.logger)

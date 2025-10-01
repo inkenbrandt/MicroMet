@@ -597,7 +597,7 @@ def rating(x):
     int
         The rating level (0, 1, or 2).
     """
-    if x is None:
+    if x is None or np.isnan(x):
         x = 0
     else:
         if 0 <= x <= 3:
