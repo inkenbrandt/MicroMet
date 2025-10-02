@@ -2,16 +2,20 @@
 This module contains data transformation functions that are used in the
 reformatting pipeline.
 """
+
 import pandas as pd
 import numpy as np
 import re
 import math
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Tuple, Union, Iterable
+
 import logging
+
 
 from micromet.utils import logger_check
 import micromet.qaqc.variable_limits as variable_limits
 import micromet.format.reformatter_vars as reformatter_vars
+
 
 # Constants
 MISSING_VALUE: int = -9999
@@ -92,9 +96,7 @@ def fix_timestamps(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     logger.debug(f"TS col {ts_col}")
     logger.debug(f"TIMESTAMP_END col {df[ts_col][0]}")
     ts_format = "%Y%m%d%H%M"
-    df["DATETIME_END"] = pd.to_datetime(
-        df[ts_col], format=ts_format, errors="coerce"
-    )
+    df["DATETIME_END"] = pd.to_datetime(df[ts_col], format=ts_format, errors="coerce")
     logger.debug(f"Len of unfixed timestamps {len(df)}")
     df = df.dropna(subset=["DATETIME_END"])
     logger.debug(f"Len of fixed timestamps {len(df)}")
@@ -156,14 +158,14 @@ def timestamp_reset(df, minutes=30):
     """
     df["TIMESTAMP_END"] = df.index.strftime("%Y%m%d%H%M").astype(int)
     df["TIMESTAMP_START"] = (
-        (df.index - pd.Timedelta(minutes=minutes))
-        .strftime("%Y%m%d%H%M")
-        .astype(int)
+        (df.index - pd.Timedelta(minutes=minutes)).strftime("%Y%m%d%H%M").astype(int)
     )
     return df
 
 
-def rename_columns(df: pd.DataFrame, data_type: str, config: dict, logger: logging.Logger) -> pd.DataFrame:
+def rename_columns(
+    df: pd.DataFrame, data_type: str, config: dict, logger: logging.Logger
+) -> pd.DataFrame:
     """
     Rename DataFrame columns based on configuration and standardize their names.
 
@@ -188,9 +190,7 @@ def rename_columns(df: pd.DataFrame, data_type: str, config: dict, logger: loggi
     pd.DataFrame
         The DataFrame with renamed and standardized column names.
     """
-    mapping = config.get(
-        "renames_eddy" if data_type == "eddy" else "renames_met", {}
-    )
+    mapping = config.get("renames_eddy" if data_type == "eddy" else "renames_met", {})
     logger.debug(f"Renaming columns from {df.columns} to {mapping}")
     df.columns = df.columns.str.strip()
     df = df.rename(columns=mapping)
@@ -390,9 +390,6 @@ def apply_physical_limits(
     )
     return (out, (mask_df if return_mask else None), report)
 
-import numpy as np
-import pandas as pd
-from typing import Iterable, Tuple, Union, Optional
 
 def mask_stuck_values(
     df: pd.DataFrame,
@@ -401,7 +398,9 @@ def mask_stuck_values(
     tolerance: Optional[float] = None,
     mask_value=np.nan,
     return_mask: bool = False,
-) -> Union[Tuple[pd.DataFrame, pd.DataFrame], Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
+) -> Union[
+    Tuple[pd.DataFrame, pd.DataFrame], Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
+]:
     """
     Detect and mask 'stuck' values in a datetime-indexed DataFrame.
 
@@ -474,7 +473,7 @@ def mask_stuck_values(
             # consider 'no change' if difference <= tolerance
             # mark a change when |diff| > tol
             diff = s.diff().abs()
-            changed = (diff > tolerance) | (~notna) | (~notna.shift(1, fill_value=False)) # type: ignore
+            changed = (diff > tolerance) | (~notna) | (~notna.shift(1, fill_value=False))  # type: ignore
         else:
             # exact equality
             # change occurs when current != previous OR either is NaN
@@ -496,7 +495,7 @@ def mask_stuck_values(
             if pd.api.types.is_numeric_dtype(block) and tolerance is not None:
                 is_const = (block.max() - block.min()) <= tolerance
             else:
-                is_const = (block.nunique(dropna=False) == 1)
+                is_const = block.nunique(dropna=False) == 1
 
             if not is_const:
                 continue  # shouldn't happen often, but keep it robust
@@ -509,7 +508,7 @@ def mask_stuck_values(
 
             meets = False
             if thresh_type == "count":
-                meets = n_rows >= thresh_count # type: ignore
+                meets = n_rows >= thresh_count  # type: ignore
             else:
                 # For single-row runs, duration == 0; interpret as < threshold
                 meets = duration >= thresh_delta
@@ -521,23 +520,31 @@ def mask_stuck_values(
                 # Stuck value for report (representative)
                 val = block.iloc[0]
 
-                report_rows.append({
-                    "column": col,
-                    "value": val,
-                    "start": start_time,
-                    "end": end_time,
-                    "n_rows": n_rows,
-                    "duration": duration,
-                    "threshold_type": thresh_type,
-                    "threshold_value": thresh_count if thresh_type == "count" else thresh_delta,
-                })
+                report_rows.append(
+                    {
+                        "column": col,
+                        "value": val,
+                        "start": start_time,
+                        "end": end_time,
+                        "n_rows": n_rows,
+                        "duration": duration,
+                        "threshold_type": thresh_type,
+                        "threshold_value": (
+                            thresh_count if thresh_type == "count" else thresh_delta
+                        ),
+                    }
+                )
 
     # Build outputs
     masked_df = df.copy()
     for col in cols:
         masked_df.loc[mask_df[col], col] = mask_value
 
-    report = pd.DataFrame(report_rows).sort_values(["column", "start"]).reset_index(drop=True)
+    report = (
+        pd.DataFrame(report_rows)
+        .sort_values(["column", "start"])
+        .reset_index(drop=True)
+    )
 
     return (masked_df, report, mask_df) if return_mask else (masked_df, report)
 
@@ -632,44 +639,102 @@ def fix_swc_percent(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     return df
 
 
-def fill_na_drop_dups(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
+def fill_na_drop_dups(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Fill missing values in primary columns with data from duplicate columns, then drop the duplicates.
+    Merge any number of duplicate columns with numeric suffixes (``.1``, ``.2``, ...),
+    treating ``-9999`` as missing, and drop redundant duplicates.
 
-    This function identifies duplicate columns (e.g., 'COLUMN.1', 'COLUMN.2'),
-    uses them to fill missing values in the primary column ('COLUMN'), and
-    then removes the duplicate columns.
+    This function groups columns by their base name (the part before a trailing
+    ``.<number>`` suffix). For each group, it merges values across the base column
+    (if present) and all suffixed duplicates by preferring the first non-missing
+    value at each row. During merging, the sentinel value ``-9999`` is treated as
+    missing (converted to ``NaN``). After merging, remaining missing values are
+    filled back with ``-9999`` and all duplicate suffixed columns are dropped,
+    preserving the base column as the canonical result.
 
     Parameters
     ----------
-    df : pd.DataFrame
-        The input DataFrame with duplicate columns.
-    logger : logging.Logger
-        The logger for tracking the fill and drop process.
+    df : pandas.DataFrame
+        Input DataFrame that may contain duplicate columns named with numeric
+        suffixes (e.g., ``"A.1"``, ``"A.2"``, ...). The unsuffixed base column
+        (e.g., ``"A"``) is optional. Sentinel missing values are expected to be
+        encoded as ``-9999``.
 
     Returns
     -------
-    pd.DataFrame
-        The DataFrame with missing values filled and duplicate columns removed.
+    pandas.DataFrame
+        A new DataFrame where, for each base column, all suffixed duplicates have
+        been merged into the base column and the duplicates removed. Any remaining
+        missing values are filled with ``-9999``.
+
+    Notes
+    -----
+    - Columns are grouped by the regex pattern ``r"^(?P<base>.+?)\\.(?P<idx>\\d+)$"``.
+      Columns not matching this pattern are treated as base columns.
+    - Merge precedence follows ascending numeric suffix order, with the base column
+      (if present) considered first.
+    - The input DataFrame is not modified in place; a copy is returned.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> import numpy as np
+    >>> df = pd.DataFrame({
+    ...     "A":   [1, -9999, 3, -9999],
+    ...     "A.1": [np.nan,  2,   -9999, 4],
+    ...     "A.2": [-9999,   9,   np.nan, -9999],
+    ...     "B.1": [10, -9999, np.nan, 13],   # no base 'B' column present
+    ...     "B.3": [np.nan, 11, 12, -9999]
+    ... })
+    >>> fill_na_drop_dups(df)
+         A     B
+    0    1  10.0
+    1    2  11.0
+    2    3  12.0
+    3    4  13.0
     """
-    for col in df.columns:
-        if col.endswith(".1"):
-            col1 = col[:-2]
-            col2 = col
-            s1 = df[col1].replace(-9999, np.nan)
-            s2 = df[col2].replace(-9999, np.nan)
-            df[col1] = s1.combine_first(s2).fillna(-9999)
-            logger.debug(f"Replaced {col1} with {col2}")
-            df = df.drop([col2], axis=1)
-        elif col.endswith(".2"):
-            col1 = col[:-2]
-            col2 = col
-            s1 = df[col1].replace(-9999, np.nan)
-            s2 = df[col2].replace(-9999, np.nan)
-            df[col1] = s1.combine_first(s2).fillna(-9999)
-            logger.debug(f"Replaced {col1} with {col2}")
-            df = df.drop([col2], axis=1)
-    return df
+    df_out = df.copy()
+    pattern = re.compile(r"^(?P<base>.+?)\.(?P<idx>\d+)$")
+
+    # Group columns by base name with numeric suffixes collected and sorted
+    groups: dict[str, list[tuple[int, str]]] = {}
+    for col in df_out.columns:
+        m = pattern.match(col)
+        if m:
+            base = m.group("base")
+            idx = int(m.group("idx"))
+            groups.setdefault(base, []).append((idx, col))
+        else:
+            # Ensure singleton group for base-only column
+            groups.setdefault(col, []).append((0, col))
+
+    to_drop: list[str] = []
+
+    for base, items in groups.items():
+        # Sort by numeric suffix (base column, if present, has idx==0)
+        items_sorted = sorted(items, key=lambda t: t[0])
+
+        merged = None
+        for _, col in items_sorted:
+            s = df_out[col].replace(-9999, np.nan)
+            merged = s if merged is None else merged.combine_first(s)
+
+        # Re-impose sentinel for any remaining NaNs
+        merged = merged.fillna(-9999)
+
+        # Write back to base column (create if it didn't exist)
+        df_out[base] = merged
+
+        # Drop all duplicates except the base
+        for _, col in items_sorted:
+            if col != base:
+                to_drop.append(col)
+
+    if to_drop:
+        # Deduplicate in case of overlap
+        df_out = df_out.drop(columns=list(dict.fromkeys(to_drop)))
+
+    return df_out
 
 
 def ssitc_scale(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
@@ -760,7 +825,9 @@ def rating(x):
     return x
 
 
-def drop_extra_soil_columns(df: pd.DataFrame, config: dict, logger: logging.Logger) -> pd.DataFrame:
+def drop_extra_soil_columns(
+    df: pd.DataFrame, config: dict, logger: logging.Logger
+) -> pd.DataFrame:
     """
     Drop redundant or unused soil-related columns from the DataFrame.
 
@@ -794,14 +861,10 @@ def drop_extra_soil_columns(df: pd.DataFrame, config: dict, logger: logging.Logg
                     continue
             except ValueError:
                 pass
-        if col in math_soils[: -DEFAULT_SOIL_DROP_LIMIT]:
+        if col in math_soils[:-DEFAULT_SOIL_DROP_LIMIT]:
             to_drop.append(col)
             continue
-        if (
-            parts[0] in {"VWC", "Ka"}
-            or col.endswith("cm_N")
-            or col.endswith("cm_S")
-        ):
+        if parts[0] in {"VWC", "Ka"} or col.endswith("cm_N") or col.endswith("cm_S"):
             to_drop.append(col)
 
     if to_drop:
@@ -893,15 +956,11 @@ def set_number_types(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
         pos = np.where(df.columns == col)[0]
         if len(pos) == 1:
             if col in ["MO_LENGTH", "RECORD", "FILE_NO", "DATALOGGER_NO"]:
-                df[col] = pd.to_numeric(
-                    df[col], downcast="integer", errors="coerce"
-                )
+                df[col] = pd.to_numeric(df[col], downcast="integer", errors="coerce")
             elif col in ["DATETIME_END"]:
                 df[col] = df[col]
             elif col in ["TIMESTAMP_START", "TIMESTAMP_END", "SSITC"]:
-                df[col] = pd.to_numeric(
-                    df[col], downcast="integer", errors="coerce"
-                )
+                df[col] = pd.to_numeric(df[col], downcast="integer", errors="coerce")
             else:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
         else:
