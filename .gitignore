@@ -68,3 +68,4 @@ station_config/output/US-UTW_monthly_data.csv
 /footprints
 /.junie/
 /.vscode/
+__pycache__

@@ -54,7 +54,7 @@ class Reformatter:
         self,
         var_limits_csv: str | Path | None = None,
         drop_soil: bool = True,
-        logger: logging.Logger = None,
+        logger: logging.Logger | None= None,
     ):
         """
         Initialize the Reformatter.

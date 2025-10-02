@@ -390,6 +390,157 @@ def apply_physical_limits(
     )
     return (out, (mask_df if return_mask else None), report)
 
+import numpy as np
+import pandas as pd
+from typing import Iterable, Tuple, Union, Optional
+
+def mask_stuck_values(
+    df: pd.DataFrame,
+    threshold: Union[int, str, pd.Timedelta],
+    columns: Optional[Iterable[str]] = None,
+    tolerance: Optional[float] = None,
+    mask_value=np.nan,
+    return_mask: bool = False,
+) -> Union[Tuple[pd.DataFrame, pd.DataFrame], Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
+    """
+    Detect and mask 'stuck' values in a datetime-indexed DataFrame.
+
+    A run is considered 'stuck' when the series does not change (within an optional
+    numeric tolerance) for at least `threshold`. Threshold can be a count of rows
+    (int) or a time duration (str like '30min' / '2H' or pd.Timedelta).
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with a DatetimeIndex (required).
+    threshold : int | str | pd.Timedelta
+        Minimum length of a non-changing run to be masked.
+        - If int: count of consecutive rows (e.g., 5).
+        - If str or Timedelta: minimum duration (e.g., '30min', pd.Timedelta('2H')).
+    columns : iterable[str], optional
+        Subset of columns to check. Defaults to all columns.
+    tolerance : float, optional
+        For numeric columns only: treat changes with absolute difference <= tolerance
+        as 'no change'. If None, exact equality is used.
+    mask_value : any, default np.nan
+        Value to assign to masked entries.
+    return_mask : bool, default False
+        If True, also return a boolean DataFrame mask where True marks masked cells.
+
+    Returns
+    -------
+    masked_df : pd.DataFrame
+        Copy of `df` with stuck runs masked.
+    report : pd.DataFrame
+        Tidy report with one row per masked run, columns:
+        ['column','value','start','end','n_rows','duration','threshold_type','threshold_value']
+    mask_df : pd.DataFrame (optional)
+        Boolean DataFrame (same shape as `df[columns]`) with True where values were masked.
+
+    Notes
+    -----
+    - NaNs act as boundaries and are never considered part of a 'stuck' run.
+    - For irregular time steps and time-based thresholds, the run 'duration'
+      is computed as end_time - start_time (inclusive of row timestamps).
+    - Entire runs that meet/exceed the threshold are masked (not just the tail beyond threshold).
+    """
+    if not isinstance(df.index, pd.DatetimeIndex):
+        raise TypeError("df must have a DatetimeIndex.")
+
+    # Normalize inputs
+    cols = list(columns) if columns is not None else list(df.columns)
+
+    if isinstance(threshold, int):
+        thresh_type = "count"
+        thresh_count = threshold
+        thresh_delta = None
+    else:
+        thresh_type = "time"
+        thresh_delta = pd.to_timedelta(threshold)
+        thresh_count = None
+
+    # Prepare mask and report accumulator
+    mask_df = pd.DataFrame(False, index=df.index, columns=cols)
+    report_rows = []
+
+    for col in cols:
+        s = df[col]
+
+        # Boundaries: treat NaNs as breaking runs
+        notna = s.notna()
+
+        # Determine "change points"
+        if pd.api.types.is_numeric_dtype(s) and tolerance is not None:
+            # consider 'no change' if difference <= tolerance
+            # mark a change when |diff| > tol
+            diff = s.diff().abs()
+            changed = (diff > tolerance) | (~notna) | (~notna.shift(1, fill_value=False)) # type: ignore
+        else:
+            # exact equality
+            # change occurs when current != previous OR either is NaN
+            prev = s.shift(1)
+            changed = (s != prev) | (~notna) | (~prev.notna())
+
+        # Group by segments of constant value (between change points)
+        group_id = changed.cumsum()
+
+        # Iterate groups that are non-NaN and constant
+        for gid, idx in s.groupby(group_id).groups.items():
+            # idx is an index of row positions (labels)
+            block = s.loc[idx]
+            if block.isna().any():
+                # skip blocks with NaN; we don't mask NaNs and they break runs
+                continue
+
+            # For safety, verify constancy within tolerance/equality
+            if pd.api.types.is_numeric_dtype(block) and tolerance is not None:
+                is_const = (block.max() - block.min()) <= tolerance
+            else:
+                is_const = (block.nunique(dropna=False) == 1)
+
+            if not is_const:
+                continue  # shouldn't happen often, but keep it robust
+
+            # Compute run stats
+            start_time = block.index[0]
+            end_time = block.index[-1]
+            n_rows = block.size
+            duration = end_time - start_time  # timedelta
+
+            meets = False
+            if thresh_type == "count":
+                meets = n_rows >= thresh_count # type: ignore
+            else:
+                # For single-row runs, duration == 0; interpret as < threshold
+                meets = duration >= thresh_delta
+
+            if meets:
+                # Mask the entire run
+                mask_df.loc[block.index, col] = True
+
+                # Stuck value for report (representative)
+                val = block.iloc[0]
+
+                report_rows.append({
+                    "column": col,
+                    "value": val,
+                    "start": start_time,
+                    "end": end_time,
+                    "n_rows": n_rows,
+                    "duration": duration,
+                    "threshold_type": thresh_type,
+                    "threshold_value": thresh_count if thresh_type == "count" else thresh_delta,
+                })
+
+    # Build outputs
+    masked_df = df.copy()
+    for col in cols:
+        masked_df.loc[mask_df[col], col] = mask_value
+
+    report = pd.DataFrame(report_rows).sort_values(["column", "start"]).reset_index(drop=True)
+
+    return (masked_df, report, mask_df) if return_mask else (masked_df, report)
+
 
 def apply_fixes(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     """
