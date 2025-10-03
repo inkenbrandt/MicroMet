@@ -6,12 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "micromet"
 description = "A comprehensive Python package for micrometeorological data analysis"
 readme = "README.md"
-version = "0.3.0"
+version = "0.3.1"
 requires-python = ">=3.11"
 license = {text = "GNU General Public License v3.0"}
 authors = [
     {name = "Paul Inkenbrandt", email = "paulinkenbrandt@utah.gov"},
-    {name = "Kathryn Ladig", email = "kladig@utah.gov"}
+    {name = "Kathryn Ladig", email = "kladig@utah.gov"},
     {name = "Diane Menuz", email = "dmenuz@utah.gov"}
 ]
 dependencies = [

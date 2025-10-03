@@ -10,7 +10,7 @@ import micromet
 project = "micromet"
 copyright = "2025, Paul Inkenbrandt, Kathryn Ladig, Diane Menuz"
 author = "Paul Inkenbrandt, Kathryn Ladig, Diane Menuz"
-release = "0.3.0"
+release = "0.3.1"
 
 master_doc = "index"  # The name of the master document (without the .rst extension)
 # -- General configuration ---------------------------------------------------
