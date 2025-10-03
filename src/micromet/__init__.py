@@ -26,7 +26,7 @@ from .format import compare
 from .report import validate
 from .report import gap_summary
 
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
 __all__ = [
     "AmerifluxDataProcessor",
