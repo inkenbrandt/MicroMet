@@ -23,6 +23,8 @@ from .format import reformatter_vars
 from .qaqc import variable_limits, netrad_limits
 from .format import add_header_from_peer
 from .format import compare
+from .report import validate
+from .report import gap_summary
 
 __version__ = "0.2.1"
 

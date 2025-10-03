@@ -120,7 +120,7 @@ class Reformatter:
         df = df.pipe(transformers.set_number_types, logger=self.logger)
         df = df.pipe(transformers.resample_timestamps, logger=self.logger)
         df = df.pipe(transformers.timestamp_reset)
-        df = df.pipe(transformers.fill_na_drop_dups, logger=self.logger)
+        df = df.pipe(transformers.fill_na_drop_dups)
 
         df = df.pipe(transformers.apply_fixes, logger=self.logger)
         df, mask, report = transformers.apply_physical_limits(df)
