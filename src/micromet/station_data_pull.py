@@ -9,46 +9,9 @@ from io import BytesIO
 import configparser
 import sqlalchemy
 from micromet.format.reformatter import Reformatter
-
+from micromet.utils import logger_check
 micromet_version = "0.2.1"
 
-
-def logger_check(logger: logging.Logger | None) -> logging.Logger:
-    """
-    Initialize and return a logger instance if none is provided.
-
-    This function checks if a logger object is provided. If not, it
-    creates a new logger with a default warning level and a stream
-    handler that outputs to the console.
-
-    Parameters
-    ----------
-    logger : logging.Logger or None
-        An existing logger instance. If None, a new logger is created.
-
-    Returns
-    -------
-    logging.Logger
-        A configured logger instance.
-    """
-    if logger is None:
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.WARNING)
-
-        # Create console handler and set level
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.WARNING)
-
-        # Create formatter
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        ch.setFormatter(formatter)
-
-        # Add handler to logger
-        logger.addHandler(ch)
-
-    return logger
 
 
 class StationDataDownloader:

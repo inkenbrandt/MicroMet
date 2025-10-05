@@ -69,3 +69,4 @@ station_config/output/US-UTW_monthly_data.csv
 /.junie/
 /.vscode/
 __pycache__
+/docs/notebooks/DL_v2 copy.ipynb

@@ -25,6 +25,7 @@ from .format import add_header_from_peer
 from .format import compare
 from .report import validate
 from .report import gap_summary
+from .format.transformers import transformers
 
 __version__ = "0.3.1"
 
@@ -40,4 +41,7 @@ __all__ = [
     "variable_limits",
     "add_header_from_peer",
     "compare",
+    "validate",
+    "gap_summary",
+    "transformers",
 ]

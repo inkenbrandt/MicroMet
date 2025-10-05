@@ -17,7 +17,7 @@ from importlib.resources import files
 import micromet.format.reformatter_vars as reformatter_vars
 import micromet.qaqc.variable_limits as variable_limits
 from micromet.utils import logger_check
-from micromet.format import transformers
+from src.micromet.format.transformers import transformers
 
 class Reformatter:
     """
@@ -84,7 +84,11 @@ class Reformatter:
 
         self.drop_soil = drop_soil
 
-    def prepare(
+    def prepare(self, df, data_type="eddy"):
+        """Current method - keep for backward compatibility"""
+        return self.process(df, data_type=data_type)
+
+    def process(
         self, df: pd.DataFrame, data_type: str = "eddy"
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """

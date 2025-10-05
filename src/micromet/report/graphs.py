@@ -5,42 +5,7 @@ import matplotlib.pyplot as plt
 import scipy
 import logging
 
-
-def logger_check(logger: logging.Logger | None) -> logging.Logger:
-    """
-    Initialize and return a logger instance if none is provided.
-
-    This function checks if a logger object is provided. If not, it
-    creates a new logger with a default warning level and a stream
-    handler that outputs to the console.
-
-    Parameters
-    ----------
-    logger : logging.Logger or None, optional
-        An existing logger instance. If None, a new logger is created.
-        Defaults to None.
-
-    Returns
-    -------
-    logging.Logger
-        A configured logger instance.
-    """
-    if logger is None:
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.WARNING)
-
-        # Create console handler and set level
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.WARNING)
-
-        # Create formatter
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        ch.setFormatter(formatter)
-
-        # Add handler to logger
-        logger.addHandler(ch)
-
-    return logger
+from micromet.utils import logger_check
 
 
 def energy_sankey(df, date_text="2024-06-19 12:00", logger: logging.Logger = None):
