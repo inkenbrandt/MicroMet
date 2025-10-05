@@ -17,7 +17,7 @@ from importlib.resources import files
 import micromet.format.reformatter_vars as reformatter_vars
 import micromet.qaqc.variable_limits as variable_limits
 from micromet.utils import logger_check
-from src.micromet.format.transformers import transformers
+from micromet.format import transformers 
 
 class Reformatter:
     """
@@ -128,8 +128,6 @@ class Reformatter:
 
         df = df.pipe(transformers.apply_fixes, logger=self.logger)
         df, mask, report = transformers.apply_physical_limits(df)
-
-        
 
         if self.drop_soil:
             df = df.pipe(transformers.drop_extra_soil_columns, config=self.config, logger=self.logger)
