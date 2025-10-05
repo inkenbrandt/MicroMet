@@ -43,9 +43,10 @@ ALBEDO = 0.25  # average for natural terrain
 EMISSIVITY = 0.98  # ground emissivity
 STEFAN_BOLTZMANN = 5.67e-8  # W/m²/K⁴
 LATITUDE = 39.5  # Utah average latitude in degrees
+LONGITUDE = -111.5  # Utah average longitude in degrees
 
 
-def solar_declination(doy):
+def solar_declination(doy: int) -> float:
     """
     Calculate the solar declination angle for a given day of the year.
 
@@ -65,7 +66,7 @@ def solar_declination(doy):
     return radians(23.44) * sin(2 * pi * (284 + doy) / 365)
 
 
-def hour_angle(hour):
+def hour_angle(hour: int) -> float:
     """
     Calculate the hour angle for a given hour of the day.
 
@@ -85,7 +86,7 @@ def hour_angle(hour):
     return radians(15 * (hour - 12))
 
 
-def solar_elevation(doy, hour, latitude=LATITUDE):
+def solar_elevation(doy: int, hour: int, latitude: float = LATITUDE) -> float:
     """
     Calculate the solar elevation angle.
 
@@ -113,7 +114,9 @@ def solar_elevation(doy, hour, latitude=LATITUDE):
     return max(0, asin(sin_elev))  # radians
 
 
-def clear_sky_radiation(doy, hour, latitude=LATITUDE):
+def clear_sky_radiation(doy: int, 
+                        hour: int, 
+                        latitude: float = LATITUDE) -> float:
     """
     Estimate the clear-sky incoming shortwave radiation.
 
@@ -353,9 +356,9 @@ def _to_local_standard_time(
 
 def sw_in_pot_noaa(
     dt_local_standard: pd.DatetimeIndex,
-    lat_deg: float,
-    lon_deg: float,
-    std_utc_offset_hours: float,
+    lat_deg: float | None = 40.7607,
+    lon_deg: float | None = -111.8939,
+    std_utc_offset_hours: int | None = -7,
 ) -> pd.Series:
     """
     Compute top-of-atmosphere shortwave irradiance using NOAA's approximations.
@@ -421,7 +424,10 @@ def sw_in_pot_noaa(
     )
 
     # Time offset (minutes)
-    time_offset = eqtime + 4.0 * lon_deg - 60.0 * std_utc_offset_hours
+    if lon_deg is None or std_utc_offset_hours is None:
+        raise ValueError("Must provide lon_deg and std_utc_offset_hours.")
+    else:
+        time_offset = eqtime + 4.0 * lon_deg - 60.0 * std_utc_offset_hours
 
     # True solar time (minutes)
     tst = hour * 60.0 + minute + second / 60.0 + time_offset
@@ -430,7 +436,10 @@ def sw_in_pot_noaa(
     ha_deg = (tst / 4.0) - 180.0
     ha = np.deg2rad(ha_deg)
 
-    lat = np.deg2rad(lat_deg)
+    if lat_deg is None:
+        raise ValueError("Must provide lat_deg.")
+    else:
+        lat = np.deg2rad(lat_deg)
 
     # Solar zenith cosine
     cos_zen = np.sin(lat) * np.sin(decl) + np.cos(lat) * np.cos(decl) * np.cos(ha)
@@ -604,9 +613,9 @@ def _fifteen_day_window_id(doy: int) -> int:
 def analyze_timestamp_alignment(
     df: pd.DataFrame,
     *,
-    lat: float,
-    lon: float,
-    std_utc_offset_hours: float,
+    lat: float | None = LATITUDE,
+    lon: float | None = LONGITUDE,
+    std_utc_offset_hours: int = -7,
     time_from: str = "CENTER",
     start_col: str = "TIMESTAMP_START",
     end_col: str = "TIMESTAMP_END",
