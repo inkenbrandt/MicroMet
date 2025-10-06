@@ -274,7 +274,7 @@ def create_reformatter_from_site(
     return Reformatter(
         site_lat=lat,
         site_lon=lon,
-        site_utc_offset=utc,
+        site_utc_offset=utc, # type: ignore
         check_timestamps=check_timestamps,
         **reformatter_kwargs
     )
