@@ -5,6 +5,7 @@ variables. The keys of the dictionary are variable names, and the
 values are dictionaries containing metadata such as description, units,
 and min/max values.
 """
+
 import numpy as np
 import datetime
 
@@ -671,7 +672,7 @@ limits = {
     "SW_IN": {
         "Description": "Shortwave radiation, incoming",
         "Units": "W m-2",
-        "Min": 0.0,
+        "Min": -20.0,
         "Max": 1300.0,
     },
     "SW_OUT": {
