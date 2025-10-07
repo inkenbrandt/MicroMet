@@ -3,7 +3,8 @@
 # validate test variables to equal 0, 1, 2
 
 import pandas as pd
-from typing import List, Dict
+from typing import List, Dict, Union
+
 
 def validate_flags(df: pd.DataFrame, 
                    flag_columns: List[str] = ['FC_SSITC_TEST', 'LE_SSITC_TEST', 'ET_SSITC_TEST', 'H_SSITC_TEST',
@@ -75,6 +76,66 @@ def validate_flags(df: pd.DataFrame,
 
     print(f"--- Validation Complete ---")
     return invalid_columns
+
+# Compare field names between dataframe and amerriflux variable names
+def compare_names_to_ameriflux(
+    df_full: pd.DataFrame,
+    amflux: Union[pd.DataFrame, pd.Series]
+) -> pd.DataFrame:
+    """
+    Cleans column names of df_full by removing '_1', '_2', '_3', and '_4' 
+    suffixes, compares the cleaned names against an 'amflux' variable list, 
+    and returns a DataFrame of the results, along with printing the unmatched columns.
+
+    Args:
+        df_full: The DataFrame whose columns need to be cleaned and matched.
+        amflux: A DataFrame or Series that contains the 'Variable' column 
+                or is the Series of variables to match against.
+
+    Returns:
+        A DataFrame containing the original columns, the cleaned columns, 
+        and a boolean indicating if the cleaned column is in the amflux list.
+    """
+    
+    # 1. Column Cleaning Logic
+    clean_columns = list(df_full.columns)
+    
+    # Iteratively remove suffixes: '_1', '_2', '_3', '_4'
+    # This loop is a condensed way to achieve the same result as the four 
+    # separate list comprehensions in the original code.
+    suffixes_to_remove = ['_1', '_2', '_3', '_4']
+    
+    for suffix in suffixes_to_remove:
+        clean_columns = [item.split(suffix)[0] for item in clean_columns]
+
+    clean_columns_series = pd.Series(clean_columns)
+    
+    # 2. Determine the AMERIFLUX Variable List for Matching
+    # Handle both Series and DataFrame inputs for amflux
+    if isinstance(amflux, pd.DataFrame) and 'Variable' in amflux.columns:
+        amflux_variables = amflux['Variable']
+    elif isinstance(amflux, pd.Series):
+        amflux_variables = amflux
+    else:
+        raise ValueError("The 'amflux' argument must be a pandas Series or a DataFrame with a 'Variable' column.")
+
+    # 3. Matching
+    is_in_amflux = clean_columns_series.isin(amflux_variables)
+    
+    # 4. Create Results DataFrame
+    results_df = pd.DataFrame({
+        'all_columns': df_full.columns,
+        'clean_columns': clean_columns,
+        'is_in_amflux': is_in_amflux
+    })
+
+    # 5. Print and Return
+    unmatched_df = results_df[results_df.is_in_amflux == False].sort_values('clean_columns')
+    
+    print('COLUMNS NOT IN AMERIFLUX VARIABLE LIST\n')
+    print(unmatched_df)
+    
+    return results_df
 
 # compare alignment between two files (one raw that is read in and one from micromet)
 def compare_to_raw(raw_file_path, micromet_df, test_var = 'NETRAD', threshold=0.1):
