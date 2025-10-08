@@ -678,7 +678,7 @@ limits = {
     "SW_OUT": {
         "Description": "Shortwave radiation, outgoing",
         "Units": "W m-2",
-        "Min": 0.0,
+        "Min": -20.0,
         "Max": 800.0,
     },
     "TCARI": {
