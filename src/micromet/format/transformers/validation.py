@@ -78,11 +78,15 @@ def apply_physical_limits(
     mask_df = pd.DataFrame(False, index=out.index, columns=out.columns)
     records = []
 
+    NA_PLACEHOLDER = -9999 
+
     for col, info in col_map.items():
         key = info["key"]
         mn = info["Min"]
         mx = info["Max"]
         ser = pd.to_numeric(out[col], errors="coerce")
+        is_na_placeholder = ser == NA_PLACEHOLDER
+        ser = ser.mask(is_na_placeholder, np.nan)
         lower_ok = (
             ser >= mn
             if not (pd.isna(mn) or (isinstance(mn, float) and math.isnan(mn)))
@@ -117,7 +121,7 @@ def apply_physical_limits(
                 "n_below": n_below,
                 "n_above": n_above,
                 "n_flagged": n_oor,
-                "pct_flagged": (n_oor / len(ser) * 100.0) if len(ser) else 0.0,
+                "pct_flagged": (n_oor / ser.notna().sum() * 100.0) if ser.notna().sum() else 0.0,
             }
         )
     report = pd.DataFrame.from_records(records).sort_values(
