@@ -195,8 +195,9 @@ config = {
         "BulkEC_60cm_Avg": "EC_3_7_1",
         "BulkEC_75cm_Avg": "EC_3_8_1",
         "BulkEC_100cm_Avg": "EC_3_9_1",
-        "BattV": "V_BATT",
-        "BATTERY_VOLTAGE": "V_BATT",
+        "BattV": "V_BATT_EDDY",
+        "BATTERY_VOLTAGE": "V_BATT_EDDY",
+        "Battery_Voltage": 'V_BATT_EDDY'
     },
     "renames_met": {
         "et_l": "ET_1_1_2",
@@ -224,8 +225,9 @@ config = {
         "SW_OUT": "SW_OUT_1_1_2",
         "LW_IN": "LW_IN_1_1_2",
         "PTemp_C": "T_PANEL",
-        "BattV": "V_BATT",
-        "BATTERY_VOLTAGE": "V_BATT",
+        "BattV": "V_BATT_MET",
+        "BATTERY_VOLTAGE": "V_BATT_MET",
+        "Battery_Voltage": 'V_BATT_MET',
         "LW_OUT": "LW_OUT_1_1_2",
         "WD": "WD_1_1_2",
         "WS": "WS_1_1_2",
