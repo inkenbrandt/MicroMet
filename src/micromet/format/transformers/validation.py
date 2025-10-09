@@ -57,13 +57,19 @@ def apply_physical_limits(
     limits_dict = variable_limits.limits
 
     out = df if inplace else df.copy()
+    no_limits = ['CO2_DENSITY_SIGMA', 'FC_SAMPLES', 
+                 'H_SAMPLES','LE_SAMPLES', 'RECORD',
+                 'TAU_QC']
+    col_list = [i for i in out.columns if i not in no_limits]
+
+
     keys = list(limits_dict.keys())
     if prefer_longest_key:
         keys.sort(key=len, reverse=True)
 
     col_map = {}
     for key in keys:
-        matching_cols = [c for c in out.columns if str(c).startswith(key)]
+        matching_cols = [c for c in col_list if str(c).startswith(key)]
         if not matching_cols:
             continue
         lim = limits_dict[key]
@@ -79,6 +85,7 @@ def apply_physical_limits(
     records = []
 
     NA_PLACEHOLDER = -9999 
+    PLACEHOLDER2 =  -999900
 
     for col, info in col_map.items():
         key = info["key"]
@@ -87,6 +94,9 @@ def apply_physical_limits(
         ser = pd.to_numeric(out[col], errors="coerce")
         is_na_placeholder = ser == NA_PLACEHOLDER
         ser = ser.mask(is_na_placeholder, np.nan)
+        is_na_placeholder2 = ser == PLACEHOLDER2
+        ser = ser.mask(is_na_placeholder2, np.nan)
+
         lower_ok = (
             ser >= mn
             if not (pd.isna(mn) or (isinstance(mn, float) and math.isnan(mn)))
