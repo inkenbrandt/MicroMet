@@ -20,6 +20,7 @@ def apply_physical_limits(
     inplace: bool = False,
     prefer_longest_key: bool = True,
     return_mask: bool = False,
+    round_et: bool=True
 ) -> tuple[pd.DataFrame, pd.DataFrame | None, pd.DataFrame]:
     """
     Apply physical Min/Max bounds to columns in a DataFrame.
@@ -42,6 +43,9 @@ def apply_physical_limits(
     return_mask : bool, optional
         If True, return a boolean mask of the values that were flagged.
         Defaults to False.
+    round_et : bool, optoinal
+        If True, ET values below 0 will be rounded to 1 digit before applying variable limits.
+        Defaults to False
 
     Returns
     -------
@@ -62,10 +66,16 @@ def apply_physical_limits(
                  'TAU_QC']
     col_list = [i for i in out.columns if i not in no_limits]
 
-
     keys = list(limits_dict.keys())
     if prefer_longest_key:
         keys.sort(key=len, reverse=True)
+
+    round_cols = ['ET_1_1_1', 'ET_1_1_2']
+    if round_et:
+        for col in round_cols:
+            if col in out.columns:
+                mask = df[col] < 0
+                out.loc[mask, col] = out.loc[mask, col].round(1)
 
     col_map = {}
     for key in keys:

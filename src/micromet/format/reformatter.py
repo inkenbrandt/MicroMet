@@ -170,6 +170,7 @@ class Reformatter:
         df = df.pipe(transformers.fill_na_drop_dups)
 
         df = df.pipe(transformers.apply_fixes, logger=self.logger)
+        # note that important to apply_fixes and rename_columns before running physical limits!
         df, mask, report = transformers.apply_physical_limits(df)
 
         # Timestamp alignment check (if enabled and radiation data available)
