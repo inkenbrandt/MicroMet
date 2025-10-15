@@ -128,7 +128,7 @@ class Reformatter:
         return self.process(df, data_type=data_type)
 
     def process(
-        self, df: pd.DataFrame, data_type: str = "eddy"
+        self, df: pd.DataFrame, stationid: str, data_type: str = "eddy"
     ) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[Dict]]:
         """
         Prepare the data by applying a series of cleaning and standardization steps.
@@ -142,6 +142,8 @@ class Reformatter:
         ----------
         df : pd.DataFrame
             The input DataFrame of station data.
+        stationid: str
+            The stationid for the station being processed
         data_type : str, optional
             The type of data being processed (e.g., 'eddy', 'met'). This is
             used to determine which column renaming map to use.
@@ -165,8 +167,9 @@ class Reformatter:
                      config=self.config, logger=self.logger)
         df = df.pipe(transformers.make_unique_cols)
         df = df.pipe(transformers.set_number_types, logger=self.logger)
-        df = df.pipe(transformers.resample_timestamps, logger=self.logger)
-        df = df.pipe(transformers.timestamp_reset)
+        #df = df.pipe(transformers.resample_timestamps, logger=self.logger)
+        df = df.pipe(transformers.resample_timestamps_interval, logger=self.logger, stationid = stationid)
+        #df = df.pipe(transformers.timestamp_reset)
         df = df.pipe(transformers.fill_na_drop_dups)
 
         df = df.pipe(transformers.apply_fixes, logger=self.logger)

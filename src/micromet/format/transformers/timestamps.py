@@ -75,6 +75,86 @@ def fix_timestamps(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     logger.debug(f"Len of fixed timestamps {len(df)}")
     return df
 
+def resample_timestamps_interval(df: pd.DataFrame, logger: logging.Logger,
+                                 data_type: str, stationid: str
+                                 ) -> pd.DataFrame:
+    """
+    Resample a DataFrame to 30-minute or 60-minute intervals.
+
+    This function resamples the DataFrame to a frequency
+    based on the 'DATETIME_END' column. The frequency is determined based on 
+    comparison between the date range of the data and the interval change date
+    specified in interval_updates.py.
+    
+    This function also handles duplicate timestamps.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame with a 'DATETIME_END' column.
+    logger : logging.Logger
+        The logger for tracking progress.
+    datatype : datatype
+
+    Returns
+    -------
+    pd.DataFrame
+        The resampled DataFrame with the resampled index and new field with datainterval
+    """
+    interval_update_dict = interval_updates.interval_update_dict
+
+    today = pd.Timestamp("today").floor("D")
+    df = df[df["DATETIME_END"] <= today]
+    df = (
+        df.drop_duplicates(subset=["DATETIME_END"])
+        .set_index("DATETIME_END")
+        .sort_index()
+    )
+    
+    if key in interval_update_dict.keys():
+        if (data_type=="eddy") & (interval_update_dict[key][0]!=None):
+            change_date = pd.to_datetime(interval_update_dict[key][0])
+        elif (data_type=="met") & (interval_update_dict[key][1]!=None):
+            change_date = pd.to_datetime(interval_update_dict[key][1])
+        else:
+            logger.debug(f"Sampling interval not changed for {key} {data_type} data")
+            change_date = None
+    if change_date:
+        if (df.index.max()<change_date):
+            logger.debug("Resampling all data to 30 minutes")
+            df = df.resample("30min").agg('first')
+            df['datainterval'] = 30
+        elif (df.index.min()>change_date):
+            logger.debug("Resampling all data to 60 minutes")
+            df = df.resample("60min").agg('first')
+            df['datainterval'] = 60
+        elif (df.index.max()>change_date) & (df.index.min()<change_date):
+            # just a check on the data interval switch date
+            time_diff_td = df.index.to_series().diff()
+            df['timediff'] = time_diff_td.dt.total_seconds() / 60
+            check60_date = (change_date + pd.Timedelta(hours=1)).floor('h')
+            check30_date = (change_date.floor('h'))
+            check30 = df.loc[df.index==check30_date, 'timediff'].iloc[0]
+            check60 = df.loc[df.index==check60_date, 'timediff'].iloc[0]
+            if (check30!=30) | (check60 != 60):
+                logger.warning("Date when sampling interval changed may be incorrect based on index differences")
+
+            logger.debug(f"Resampling data to 30 minutes before {change_date} and 60 minutes after")
+            df60 = df[df.index>change_date]
+            df60 = df60.resample("60min").agg('first')
+            df60['datainterval'] = 60
+            df30 = df[df.index<=change_date]
+            df30 = df30.resample("30min").agg('first')
+            df30['datainterval'] = 30
+            df = pd.concat([df30, df60])
+            df.drop(columns=['timediff'], inplace=True)
+    else:
+        df = df.resample("30min").agg('first')
+        df['datainterval'] = 30
+        logger.debug("Resampling all data to 30 minutes")
+
+    return df
+
 
 def resample_timestamps(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     """
@@ -140,5 +220,6 @@ __all__ = [
     "infer_datetime_col",
     "fix_timestamps",
     "resample_timestamps",
+    "resample_timestamps_interval",
     "timestamp_reset",
 ]
