@@ -25,6 +25,7 @@ from .format import compare
 from .report import validate
 from .report import gap_summary
 from .format import transformers
+from .format import merge
 from .format.transformers import columns, timestamps, validation, corrections, cleanup, MISSING_VALUE
 
 __version__ = "0.3.1"
