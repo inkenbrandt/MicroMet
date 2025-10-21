@@ -26,7 +26,9 @@ from .report import validate
 from .report import gap_summary
 from .format import transformers
 from .format import merge
-from .format.transformers import columns, timestamps, validation, corrections, cleanup, MISSING_VALUE
+from .qaqc import data_cleaning
+from .qaqc import file_comparison
+from .format.transformers import columns, timestamps, validation, corrections, cleanup, interval_updates, MISSING_VALUE
 
 __version__ = "0.3.1"
 
