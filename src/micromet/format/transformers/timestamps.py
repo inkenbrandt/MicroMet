@@ -76,25 +76,27 @@ def fix_timestamps(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     return df
 
 
-def resample_timestamps(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
+def resample_timestamps(df: pd.DataFrame, interval: int, logger: logging.Logger) -> pd.DataFrame:
     """
-    Resample a DataFrame to 30-minute intervals.
+    Resample a DataFrame to 30- or 60- minute intervals.
 
-    This function resamples the DataFrame to a fixed 30-minute frequency
+    This function resamples the DataFrame to a fixed 30-or 60-minute frequency
     based on the 'DATETIME_END' column. It also handles duplicate
-    timestamps and interpolates missing data.
+    timestamps  by selecting the first available value.
 
     Parameters
     ----------
     df : pd.DataFrame
         The input DataFrame with a 'DATETIME_END' column.
+    interval: int
+        The resampling interval in minutes (30 or 60 minutes)
     logger : logging.Logger
         The logger for tracking progress.
 
     Returns
     -------
     pd.DataFrame
-        The resampled DataFrame with a 30-minute frequency index.
+        The resampled DataFrame with a 30- or 60-minute frequency index.
     """
     today = pd.Timestamp("today").floor("D")
     df = df[df["DATETIME_END"] <= today]
@@ -103,7 +105,15 @@ def resample_timestamps(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFram
         .set_index("DATETIME_END")
         .sort_index()
     )
-    df = df.resample("30min").first().interpolate(limit=1)
+    if (interval ==30) or (interval==60):
+        interval_str = str(interval)+"min"
+    else:
+        logger.debug(f"Interval not 30 or 60 minutes; resampling at default rate of 30 minutes")
+        interval_str = "30min"
+        interval = 30
+
+    df = df.resample(interval_str).agg('first')
+    df["SAMPLING_INTERVAL"] = interval
     logger.debug(f"Len of resampled timestamps {len(df)}")
     return df
 

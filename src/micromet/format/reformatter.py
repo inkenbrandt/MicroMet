@@ -128,7 +128,7 @@ class Reformatter:
         return self.process(df, data_type=data_type)
 
     def process(
-        self, df: pd.DataFrame, data_type: str = "eddy"
+        self, df: pd.DataFrame, interval: int, data_type: str = "eddy"
     ) -> Tuple[pd.DataFrame, pd.DataFrame, Optional[Dict]]:
         """
         Prepare the data by applying a series of cleaning and standardization steps.
@@ -146,6 +146,8 @@ class Reformatter:
             The type of data being processed (e.g., 'eddy', 'met'). This is
             used to determine which column renaming map to use.
             Defaults to 'eddy'.
+        interval: int
+            The sampling interval used with the data; must be either 30 or 60 minutes
 
         Returns
         -------
@@ -165,8 +167,8 @@ class Reformatter:
                      config=self.config, logger=self.logger)
         df = df.pipe(transformers.make_unique_cols)
         df = df.pipe(transformers.set_number_types, logger=self.logger)
-        df = df.pipe(transformers.resample_timestamps, logger=self.logger)
-        df = df.pipe(transformers.timestamp_reset)
+        df = df.pipe(transformers.resample_timestamps, interval=interval, logger=self.logger)
+        df = df.pipe(transformers.timestamp_reset, minutes=interval)
         df = df.pipe(transformers.fill_na_drop_dups)
 
         df = df.pipe(transformers.apply_fixes, logger=self.logger)
