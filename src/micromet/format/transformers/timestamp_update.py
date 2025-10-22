@@ -1,3 +1,73 @@
+''' various scripts
+for trying to address timestamp issues in the data
+'''
+
+
+'''
+I haven't gotten this script to work properly yet. The script has
+errored out at the part where I process the df60 dataframe, though the
+df30 processing worked fine.
+
+Note that this script requires that you identify the datetime column 
+before running "process" which may be problematic for some files.
+
+Here is an example of how I was running the script:
+
+am_data = micromet.Reformatter(drop_soil=True,logger=logger)
+in_df = pd.read_csv(file_to_read,skiprows=[0,2,3],
+                    na_values=[-9999,"NAN","NaN","nan"])
+in_df['TIMESTAMP'] = pd.to_datetime(in_df['TIMESTAMP'])
+in_df["TIMESTAMP_END"] = in_df.TIMESTAMP.dt.strftime("%Y%m%d%H%M").astype(int)
+df, report = process_by_interval(in_df, key, interval_dict, datatype)
+
+'''
+def process_by_interval(in_df, key, interval_dict, datatype):
+    '''
+    The goal of this script is to use the interval_updates dictionary to 
+    identify when data switched from 30 to 60 minute sampling and then process
+    the data correctly. 
+    '''
+    if key in interval_dict.keys():
+        if (datatype=="eddy") & (interval_dict[key][0]!=None):
+            change_date = pd.to_datetime(interval_dict[key][0])
+        elif (datatype=="met") & (interval_dict[key][1]!=None):
+            change_date = pd.to_datetime(interval_dict[key][1])
+        else:
+            logger.debug(f"Station not in interval dictionary for {key} {datatype} data")
+            change_date = None
+    if change_date:
+        if (in_df.TIMESTAMP.max()<change_date):
+            logger.debug("Processing all data at 30 minutes")
+            df, report, checktime = am_data.process(in_df, interval=30, data_type=datatype)
+        elif (in_df.TIMESTAMP.min()>change_date):
+            logger.debug("Processing all data at 60 minutes")
+            df, report, checktime = am_data.process(in_df, interval=60, data_type=datatype)
+        elif (in_df.TIMESTAMP.max()>change_date) & (in_df.TIMESTAMP.min()<change_date):
+            #just a check on the data interval switch date
+            time_diff_td = in_df.TIMESTAMP.diff()
+            in_df['timediff'] = time_diff_td.dt.total_seconds() / 60
+            check60_date = (change_date + pd.Timedelta(hours=1)).floor('h')
+            check30_date = (change_date.floor('h'))
+            check30 = in_df.loc[in_df.TIMESTAMP==check30_date, 'timediff'].iloc[0]
+            check60 = in_df.loc[in_df.TIMESTAMP==check60_date, 'timediff'].iloc[0]
+            if (check30!=30) | (check60 != 60):
+                logger.warning("Date when sampling interval changed may be incorrect based on index differences")
+            in_df.drop(columns=['timediff'], inplace=True)
+
+            logger.debug(f"Processing data at 30 minutes before {change_date} and 60 minutes after")
+            df60 = in_df[in_df.TIMESTAMP>change_date]
+            df60_process, report60, checktime = am_data.process(df60, interval=60, data_type=datatype)
+            df30 = in_df[in_df.TIMESTAMP<=change_date]
+            df30_process, report30, checktime = am_data.process(df30, interval=30, data_type=datatype)
+            df = pd.concat([df60_process, df30_process])
+            report = pd.concat([report30, report60])
+    else:
+        logger.warning("Site not found in interval dictionary; processing all data to 30 minutes")
+        df, report, checktime = am_data.process(in_df, interval=30, data_type=datatype)
+    return(df, report)
+
+
+
 import pandas as pd
 import numpy as np
 
