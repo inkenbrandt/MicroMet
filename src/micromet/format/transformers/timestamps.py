@@ -107,6 +107,7 @@ def resample_timestamps(df: pd.DataFrame, interval: int, logger: logging.Logger)
     )
     if (interval ==30) or (interval==60):
         interval_str = str(interval)+"min"
+        logger.debug(f'Resampling at interval of {interval_str}')
     else:
         logger.debug(f"Interval not 30 or 60 minutes; resampling at default rate of 30 minutes")
         interval_str = "30min"
