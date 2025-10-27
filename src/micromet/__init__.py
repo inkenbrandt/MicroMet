@@ -27,6 +27,7 @@ from .report import gap_summary
 from .report import eddy_plots
 from .format import transformers
 from .format import merge
+from .format import file_compile
 from .qaqc import data_cleaning
 from .format.transformers import columns, timestamps, validation, corrections, cleanup, interval_updates, MISSING_VALUE
 
