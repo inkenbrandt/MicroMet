@@ -289,8 +289,11 @@ def data_diff_check(df1, df2):
             df2 = df2.dropna(subset = [col])
             df1_prep, df2_prep = prep_for_comparison(df1, df2)
             x = df1_prep[col].compare(df2_prep[col])
-            diff = len(x)/len(df1_prep)*100
-            percent_diff[col] = diff
+            if len(df1_prep)>0:
+                diff = len(x)/len(df1_prep)*100
+                percent_diff[col] = diff
+            else:
+                percent_diff[col] = -9999
     result_df = pd.DataFrame.from_dict(
         percent_diff, 
         orient='index', 

@@ -24,6 +24,7 @@ from .qaqc import variable_limits, netrad_limits
 from .format import compare
 from .report import validate
 from .report import gap_summary
+from .report import eddy_plots
 from .format import transformers
 from .format import merge
 from .qaqc import data_cleaning
