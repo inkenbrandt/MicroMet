@@ -13,6 +13,7 @@ Key logic:
 from __future__ import annotations
 import argparse
 import os
+import re
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
@@ -67,17 +68,19 @@ def _get_creation_time(p: Path) -> float:
     return st.st_ctime  # Windows: creation, Linux: change time
 
 
-def _gather_files(root: Path, contains: str, case_sensitive: bool) -> List[Path]:
+def _gather_files(root: Path, pattern: str, case_sensitive: bool = True) -> List[Path]:
     """
-    Gather all files in a directory tree that contain a specific substring.
+    Gather all files in a directory tree whose names match a specific pattern.
 
     Parameters
     ----------
     root : Path
         The root directory to start the search from.
-    contains : str
-        The substring to search for in filenames.
-    case_sensitive : bool
+    pattern : str
+        The regular expression pattern to search for in filenames.
+        For a simple substring search, you can pass the substring directly,
+        and it will be treated as an escaped literal pattern.
+    case_sensitive : bool, default True
         Whether the search should be case-sensitive.
 
     Returns
@@ -86,15 +89,29 @@ def _gather_files(root: Path, contains: str, case_sensitive: bool) -> List[Path]
         A list of paths to the files that match the criteria.
     """
     files: List[Path] = []
-    if not case_sensitive:
-        contains_low = contains.lower()
+    
+    # 1. Escape the pattern to treat it as a literal string for simple searches
+    # If the user wants to use true regex, they must escape special characters themselves,
+    # or you could introduce an 'is_regex' flag, but for simplicity, we'll assume
+    # the user is passing a regex pattern for complex searches.
+    
+    # Compile the regex pattern with or without IGNORECASE flag
+    flags = 0 if case_sensitive else re.IGNORECASE
+    try:
+        compiled_pattern = re.compile(pattern, flags=flags)
+    except re.error:
+        # Handle cases where the pattern might be malformed, though less likely
+        # if the user is careful.
+        print(f"Error compiling regex pattern: {pattern}")
+        return files
+
 
     for dirpath, _, filenames in os.walk(root):
         for fn in filenames:
-            hay = fn if case_sensitive else fn.lower()
-            needle = contains if case_sensitive else contains_low  # type: ignore
-            if needle in hay:
+            # 2. Use re.search() to check for a match
+            if compiled_pattern.search(fn):
                 files.append(Path(dirpath) / fn)
+                
     return files
 
 
