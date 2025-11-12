@@ -303,6 +303,7 @@ def data_diff_check(df1, df2):
 
 
 def review_lags(data1, data2, max_lag=4):
+
     """
     Calculates the Cross-Correlation Function (CCF) to find the optimal time 
     lag between two time series.
@@ -359,3 +360,119 @@ def review_lags(data1, data2, max_lag=4):
     except Exception as E:
         print(E)
     return cross_correlations, optimal_lag, max_correlation_value
+
+
+
+
+def validate_timeseries_data(df: pd.DataFrame, interval_minutes: int, date_format: str = '%Y%m%d%H%M') -> Dict[str, Union[bool, str]]:
+    """
+    Performs several validation checks on a time-series DataFrame with a DatetimeIndex.
+
+    This version includes a robust type coercion step (astype(str) + regex cleanup) 
+    to handle the scenario where the START/END columns contain unparsed numeric data
+    (like floats ending in .0) which causes comparison failures.
+
+    Args:
+        df: The input DataFrame, expected to have a DatetimeIndex and columns 
+            named 'TIMESTAMP_START' and 'TIMESTAMP_END' containing datetime-like data.
+        interval_minutes: The expected interval between index entries (e.g., 30 or 60).
+        date_format: The format string for converting string/numeric dates (default is '%Y%m%d%H%M').
+
+    Returns:
+        A dictionary summarizing the results of the three validation checks.
+    """
+    
+    results = {}
+    
+    # 0. Data Standardization for Robustness (Fixing the Type Mismatch Issue)
+    
+    # Check if required columns exist
+    if 'TIMESTAMP_END' not in df.columns or 'TIMESTAMP_START' not in df.columns:
+        return {
+            'error': True,
+            'message': "Required columns 'TIMESTAMP_START' and 'TIMESTAMP_END' not found. Please ensure your DataFrame columns are named exactly 'TIMESTAMP_START' and 'TIMESTAMP_END'."
+        }
+
+    try:
+        # Robust Conversion: Handles original data being string, int, or float (like 202406190000.0)
+        # 1. astype(str): Converts any numeric type to string.
+        # 2. str.replace: Removes trailing '.0' from float conversions.
+        # 3. pd.to_datetime: Converts the clean string to a proper datetime object.
+        df['END_dt'] = pd.to_datetime(
+            df['TIMESTAMP_END'].astype(str).str.replace(r'\.0$', '', regex=True), 
+            format=date_format, 
+            errors='coerce'
+        )
+        df['START_dt'] = pd.to_datetime(
+            df['TIMESTAMP_START'].astype(str).str.replace(r'\.0$', '', regex=True), 
+            format=date_format, 
+            errors='coerce'
+        )
+    except Exception as e:
+        return {
+            'error': True,
+            'message': f"Data conversion failed. Check your 'TIMESTAMP_START'/'TIMESTAMP_END' data and 'date_format' argument. Error: {e}"
+        }
+
+    # Check for NaT (Not a Time) values resulting from failed conversions
+    if df['END_dt'].isna().any() or df['START_dt'].isna().any():
+        return {
+            'error': True,
+            'message': "Data conversion resulted in NaT values (unparsable dates). Check your input data consistency."
+        }
+
+
+    # 1. Define Timedelta objects for comparison
+    # Both index interval and duration must match this Timedelta
+    interval_td = pd.Timedelta(minutes=interval_minutes)
+    
+    # --- CHECK 1: Index Interval Validation ---
+    index_diff = df.index.to_series().diff().dropna()
+    
+    if index_diff.empty:
+        is_index_consistent = True
+        index_status = "Index consistency check skipped (1 or 0 rows)."
+    else:
+        is_index_consistent = (index_diff == interval_td).all()
+        if is_index_consistent:
+            index_status = f"PASS: All index intervals are exactly {interval_minutes} minutes."
+        else:
+            first_fail = index_diff[index_diff != interval_td].iloc[0]
+            fail_index = index_diff[index_diff != interval_td].index[0] 
+            index_status = f"FAIL: Index interval is inconsistent. First discrepancy ends at {fail_index}: Found {first_fail} (Expected {interval_td})."
+
+    results['index_interval_check'] = is_index_consistent
+    results['index_interval_status'] = index_status
+
+
+    # --- CHECK 2: End Value Match (The type mismatch fix) ---
+    # Does the 'END_dt' value match the index?
+    is_end_matching_index = (df['END_dt'] == df.index).all()
+    if is_end_matching_index:
+        end_status = "PASS: All 'TIMESTAMP_END' values exactly match the DatetimeIndex."
+    else:
+        mismatch_series = df[df['END_dt'] != df.index].iloc[0]
+        # Using the original column name 'TIMESTAMP_END' and 'Index' for better clarity in the fail message
+        end_status = f"FAIL: First mismatch at index {mismatch_series.name}. TIMESTAMP_END={mismatch_series['TIMESTAMP_END']}, Index={mismatch_series.name}. (Comparison failed due to mismatched time or type)."
+        
+    results['end_match_check'] = is_end_matching_index
+    results['end_match_status'] = end_status
+
+
+    # --- CHECK 3: Start-End Difference Validation (UPDATED) ---
+    # Is the START value exactly 'interval_minutes' before the END value?
+    duration = df['END_dt'] - df['START_dt']
+    # Check against the general interval_td (e.g., 30 min or 60 min)
+    is_duration_consistent = (duration == interval_td).all() 
+    
+    if is_duration_consistent:
+        duration_status = f"PASS: All TIMESTAMP_START-TIMESTAMP_END durations are exactly {interval_minutes} minutes."
+    else:
+        mismatch_index = duration[duration != interval_td].index[0]
+        first_fail = duration[duration != interval_td].iloc[0]
+        duration_status = f"FAIL: Duration inconsistent. First mismatch at index {mismatch_index}: Found {first_fail} (Expected {interval_minutes} minutes)."
+
+    results['duration_check'] = is_duration_consistent
+    results['duration_status'] = duration_status
+        
+    return results

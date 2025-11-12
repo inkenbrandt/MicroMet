@@ -10,7 +10,7 @@ DATETIME_END
 """
 
 interval_update_dict = {
-    "US-UTE":	["10/9/2025 11:30",	"10/9/2025 11:50"],
+    "US-UTE":	["10/9/2025 11:20",	"10/9/2025 11:20"], # verified; note that first ameriflux statistics record after break needs to be dropped
     "US-UTJ":	["10/9/2025 12:04",	"10/9/2025 12:05"], # verified 10/28/2025
     "US-UTB":	["10/9/2025 13:08",	None],
     #'US-UTD':   []
