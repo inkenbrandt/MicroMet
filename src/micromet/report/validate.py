@@ -1,12 +1,13 @@
 
 
-# validate test variables to equal 0, 1, 2
 
 import pandas as pd
 import numpy as np
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Optional
+import plotly.graph_objects as go
 
 
+# validate test variables to equal 0, 1, 2
 def validate_flags(df: pd.DataFrame, 
                    flag_columns: List[str] = ['FC_SSITC_TEST', 'LE_SSITC_TEST', 'ET_SSITC_TEST', 'H_SSITC_TEST',
        'TAU_SSITC_TEST'], 
@@ -176,6 +177,7 @@ def compare_to_raw(raw_file_path, micromet_df, test_var = 'NETRAD', threshold=0.
     value_differences = combo.loc[(le_diff.abs()>threshold), ['DATETIME_END',f'{test_var}_1_1_1', f'{test_var}']]
     return(value_differences)
 
+# check for consistency between DATETIME_END and TIMESTAMP_END fields
 def validate_timestamp_consistency(df: pd.DataFrame) -> pd.DataFrame:
     """
     Checks for consistency between a standardized datetime column (DATETIME_END)
@@ -234,7 +236,113 @@ def validate_timestamp_consistency(df: pd.DataFrame) -> pd.DataFrame:
     
     return mismatch_report
 
+# Find extended periods of time where sensor read 0 values (used with precip data)
+def find_zero_chunks(
+    df: pd.DataFrame,
+    var_name: str,
+    days_threshold: int,
+    aggregation_method: str = 'sum', # New parameter to determine daily aggregation
+    tolerance: float = 1e-6
+) -> pd.DataFrame:
+    """
+    Identifies continuous chunks of time where a variable is effectively zero or NaN,
+    treating NaNs as part of the zero gap.
 
+    The function first resamples the high-frequency data to daily ('D') frequency
+    using the specified aggregation method before checking for long zero periods.
+
+    Args:
+        df: The pandas DataFrame with a DatetimeIndex (any frequency).
+        var_name: The name of the column to check for zero values.
+        days_threshold: The minimum number of consecutive days required to be
+                        identified as a "long zero chunk".
+        aggregation_method: The method used to aggregate high-frequency data to daily.
+                            Options: 'sum' (default) or 'max'.
+        tolerance: A small value used to check if a float is close to zero.
+
+    Returns:
+        A DataFrame listing the 'Start Day', 'End Day', and 'Duration (Days)'
+        for each identified long zero chunk.
+    """
+    if not isinstance(df.index, pd.DatetimeIndex):
+        print("Error: DataFrame index must be a DatetimeIndex.")
+        return pd.DataFrame()
+
+    if aggregation_method not in ['sum', 'max']:
+        print(f"Error: Invalid aggregation_method '{aggregation_method}'. Must be 'sum' or 'max'.")
+        return pd.DataFrame()
+
+    # 1. Resample the data to daily frequency ('D') using the specified method
+    # The resulting index represents the start of each day.
+    try:
+        df_daily = df[var_name].resample('D').agg(aggregation_method)
+    except Exception as e:
+        print(f"Error during resampling with method '{aggregation_method}': {e}")
+        return pd.DataFrame()
+
+    # The period threshold is now simply the number of days, as we are working with daily periods.
+    # period_threshold is kept for clarity but is equal to days_threshold
+    period_threshold = days_threshold
+
+    # 2. Create a boolean mask: True if daily aggregated value is near zero OR is NaN
+    is_zero_or_na = (df_daily.abs() < tolerance) | (df_daily.isna())
+
+    # 3. Calculate consecutive count of 'is_zero_or_na' being True
+    # (~is_zero_or_na).cumsum() creates a group ID that changes only when a non-zero day is found.
+    consecutive_zero_count = is_zero_or_na.astype(int).groupby(
+        (~is_zero_or_na).cumsum()
+    ).cumsum()
+
+    # 4. Determine chunk end points using boolean mask differences
+    # We create a mask for where the streak is broken (non-zero value occurs)
+    is_streak_broken = (~is_zero_or_na).astype(int).diff().fillna(0)
+
+    # An end occurs on the period *before* the streak is broken (where is_streak_broken == 1)
+    # The current day is the first non-zero day, so we shift back by one day to get the end of the zero chunk.
+    end_indices_before_transition = is_streak_broken[is_streak_broken == 1].index - pd.Timedelta(days=1)
+
+    # If the DataFrame ends while still in a zero chunk, the end time is the last index
+    if is_zero_or_na.iloc[-1]:
+        end_indices_before_transition = end_indices_before_transition.append(pd.Index([df_daily.index[-1]]))
+
+    # Use unique, sorted list of all valid end points
+    all_end_indices = end_indices_before_transition.unique().sort_values()
+
+    # 5. Calculate the Start Day by backtracking from the End Day
+    chunks: List[Dict[str, Union[pd.Timestamp, float]]] = []
+    
+    # Keep track of starts to avoid processing overlapping chunks (if any)
+    processed_start_days = set()
+
+    for end in all_end_indices:
+        # Get the length of the consecutive zero run ending on this day
+        # We must ensure the index 'end' is in the index for lookup
+        if end in consecutive_zero_count.index:
+            streak_length = consecutive_zero_count.loc[end]
+
+            # Only process if the streak length meets the threshold
+            if streak_length >= days_threshold:
+                # Calculate the TRUE start day: Start = End - (Length - 1 day)
+                # This correctly identifies the absolute first day of the zero streak.
+                start = end - pd.Timedelta(days=int(streak_length) - 1)
+                
+                # Duration is simply the streak length
+                duration = float(streak_length)
+                
+                normalized_start = start.normalize()
+                
+                # Check for overlapping chunks before appending (shouldn't happen with this logic, but safe)
+                if normalized_start not in processed_start_days:
+                    chunks.append({
+                        'Start Day': normalized_start,
+                        'End Day': end.normalize(),
+                        'Duration (Days)': duration
+                    })
+                    processed_start_days.add(normalized_start)
+
+    return pd.DataFrame(chunks)
+
+# preps two dataframes to run the compare function
 def prep_for_comparison(df1: pd.DataFrame, df2: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Prepares two pandas DataFrames for comparison by:
@@ -261,7 +369,7 @@ def prep_for_comparison(df1: pd.DataFrame, df2: pd.DataFrame) -> tuple[pd.DataFr
 
     return df1_prep, df2_prep
 
-
+# check differences between dataframes column by column, ignoring Na values
 def data_diff_check(df1, df2):
     """
     Calculates the percent of non-null fields that differ between two 
@@ -301,7 +409,7 @@ def data_diff_check(df1, df2):
     )
     return(result_df)
 
-
+# determine the optimal lag between two series
 def review_lags(data1, data2, max_lag=4):
 
     """
@@ -361,9 +469,7 @@ def review_lags(data1, data2, max_lag=4):
         print(E)
     return cross_correlations, optimal_lag, max_correlation_value
 
-
-
-
+# performs more timeseries validation steps
 def validate_timeseries_data(df: pd.DataFrame, interval_minutes: int, date_format: str = '%Y%m%d%H%M') -> Dict[str, Union[bool, str]]:
     """
     Performs several validation checks on a time-series DataFrame with a DatetimeIndex.
@@ -476,3 +582,116 @@ def validate_timeseries_data(df: pd.DataFrame, interval_minutes: int, date_forma
     results['duration_status'] = duration_status
         
     return results
+
+# evaluate offset in time series data in rolling sections
+def detect_sectional_offsets_indexed(
+    df1, df2, value_col1, value_col2,
+    freq='h', max_lag=24, window_size='7D'
+):
+    """
+    Evaluates time offsets between two time series data frames ((datetime-indexed) in
+    rolling sections. Returns the best lag with the best offset for each time window.
+
+    Parameters:
+    - df1, df2: DataFrames with datetime index.
+    - value_col1: name of the column with numerical values to compare for df1
+    - value_col2: name of the column with numerical values to compare for df2
+    - freq: resampling frequency (e.g., 'h' for hourly).
+    - max_lag: maximum lag (in units of freq) to test.
+    - window_size: time window for sectional comparison (e.g., '7D' or '12H').
+
+    Returns:
+    - DataFrame with lag information per window.
+    """
+
+    # Resample both series to ensure regular intervals
+    s1 = df1[value_col1].resample(freq).mean()
+    s2 = df2[value_col2].resample(freq).mean()
+
+    # Align both series to ensure same timestamps and drop NaNs introduced by resampling
+    # Keeping only timestamps present in BOTH resampled series.
+    s1, s2 = s1.align(s2, join='inner')
+    
+    # Drop any remaining NaNs (from initial data gaps) for cleaner segmenting
+    # This prevents forward-filling over large gaps, which can be misleading.
+    combined = pd.DataFrame({'s1': s1, 's2': s2}).dropna()
+    s1 = combined['s1']
+    s2 = combined['s2']
+    
+    # Check if any data remains after cleaning
+    if len(s1) == 0:
+        return pd.DataFrame()
+
+    # Create window start times
+    window_starts = pd.date_range(s1.index.min(), s1.index.max(), freq=window_size)
+    results = []
+
+    for start in window_starts:
+        end = start + pd.to_timedelta(window_size)
+        
+        # Select the segment from the cleaned (aligned and dropped NA) series
+        seg1 = s1.loc[start:end] 
+        seg2 = s2.loc[start:end]
+
+        # Check for sufficient data points in the window
+        if len(seg1) < max_lag * 2 or len(seg2) < max_lag * 2:
+            continue  # Skip short or empty windows
+
+        lags = np.arange(-max_lag, max_lag + 1)
+        
+        # Calculate correlations. pd.Series.corr() automatically handles NaNs
+        # that might arise from shifting (e.g., when aligning a lagged series)
+        correlations = [seg1.corr(seg2.shift(lag)) for lag in lags]
+
+        if all(pd.isna(correlations)):
+            continue
+
+        best_lag = lags[np.nanargmax(correlations)]
+        best_corr = np.nanmax(correlations)
+
+        results.append({
+            'window_start': start,
+            'best_lag': best_lag,
+            'correlation': best_corr
+        })
+
+    result_df = pd.DataFrame(results)
+
+    return result_df
+
+# plots the results of detect_sectional_offsets_indexed
+def plot_sectional_lags_plotly(corr_check, height=400):
+    """
+    Plots the results of the detect_sectional_offsets_indexed function,
+    showing the best lag for each timeperiod
+    """
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=corr_check['window_start'],
+        y=corr_check['best_lag'],
+        mode='lines+markers',
+        name='Best Lag',
+        line=dict(color='royalblue'),
+        marker=dict(size=6)
+    ))
+
+    # Add zero-lag reference line
+    fig.add_trace(go.Scatter(
+        x=[corr_check['window_start'].min(), corr_check['window_start'].max()],
+        y=[0, 0],
+        mode='lines',
+        name='Zero Lag',
+        line=dict(color='gray', dash='dash')
+    ))
+
+    fig.update_layout(
+        title='Sectional Time Lag Detection',
+        xaxis_title='Window Start Time',
+        yaxis_title=f'Best Time Lag',
+        template='plotly_white',
+        hovermode='x unified',
+        height=height
+    )
+
+    fig.show()
