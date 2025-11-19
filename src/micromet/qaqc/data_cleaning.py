@@ -171,3 +171,132 @@ def apply_lag_shift(df, detected_lag, freq_unit):
     df_aligned = df.set_index(df.index + time_offset)
     
     return df_aligned
+
+
+def apply_internal_flags(df, 
+                              flag_cols,
+                              start_date,
+                              end_date,
+                              flag_value,
+                              ):
+    """
+    Applies a specified flag value across multiple specified flag columns 
+    within a given date range.
+    ... (Docstring contents omitted for brevity, but they are correct)
+    """
+    # 1. Create a copy to avoid modifying the original DataFrame
+    df2 = df.copy()
+
+    # 2. Format dates
+    start_date_format = pd.to_datetime(start_date)
+    end_date_format = pd.to_datetime(end_date)
+    
+    # 3. Validation: Check if ALL specified flag columns exist
+    missing_cols = [col for col in flag_cols if col not in df.columns]
+    
+    if missing_cols:
+        raise KeyError(f"The following required flag column(s) were not found in the DataFrame: {missing_cols}")
+    
+    # 4. Apply the flag (This block was incorrectly indented)
+    # Create a boolean mask for the date range
+    mask = (df2.index >= start_date_format) & (df2.index <= end_date_format)
+    
+    # Apply the flag value to the selected rows/columns
+    df2.loc[mask, flag_cols] = flag_value
+        
+    return df2
+
+
+# train regressoin model
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+import numpy as np
+from typing import Tuple, Dict, Any
+
+def train_linear_regression_model(
+    df: pd.DataFrame, 
+    target_col: str, 
+    predictor_col: str
+) -> Tuple[LinearRegression | None, Dict[str, Any]]:
+    """
+    Trains a Linear Regression model using complete data from two specified columns.
+
+    Args:
+        df: The input pandas DataFrame.
+        target_col: The name of the column containing the dependent variable (Y).
+        predictor_col: The name of the column containing the independent variable (X).
+
+    Returns:
+        A tuple containing:
+        1. The trained LinearRegression model instance (or None if training fails).
+        2. A dictionary of model results (e.g., intercept and coefficient).
+    """
+    # 1. Identify rows with complete data for model training
+    complete_data = df.dropna(subset=[predictor_col, target_col])
+
+    # Check if we have enough data to train a model
+    if len(complete_data) < 10:
+        print("Error: Not enough complete data points to train the linear regression model.")
+        return None, {}
+
+    # Prepare training features (X) and target (Y)
+    X_train = complete_data[[predictor_col]]
+    y_train = complete_data[target_col]
+
+    # 2. Train the Linear Regression model
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+
+    # 3. Compile results for evaluation
+    model_results = {
+        "intercept": round(model.intercept_, 3),
+        "coefficient": round(model.coef_[0], 3),
+        "r_squared": round(model.score(X_train, y_train), 3),
+        "training_n_samples": len(complete_data)
+    }
+
+    return model, model_results
+
+# impute values from regression model
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+
+def impute_missing_values(
+    df: pd.DataFrame, 
+    model: LinearRegression, 
+    target_col: str, 
+    predictor_col: str
+) -> pd.Series:
+    """
+    Imputes missing values using Linear Regression and returns the resulting 
+    imputed column as a Series, without creating a full DataFrame copy.
+    """
+    # 1. Start with a copy of the target Series (Y) – This is the only copy needed
+    imputed_series = df[target_col].copy(deep=True)
+
+    # 2. Identify rows needing imputation
+    missing_mask = imputed_series.isna()
+    
+    # Identify rows where we have the predictor (X) and need to predict Y
+    # Use .notna() on the DataFrame column predictor_col
+    imputation_rows_mask = missing_mask & df[predictor_col].notna()
+
+    if not imputation_rows_mask.any():
+        print(f"No missing values in '{target_col}' that can be imputed using '{predictor_col}'.")
+        return imputed_series.rename(new_col)
+
+    # 3. Prepare prediction features (X)
+    # Select the predictor column for only the rows that need imputation
+    X_predict = df.loc[imputation_rows_mask, [predictor_col]]
+
+    # 4. Predict the missing values
+    predictions = model.predict(X_predict)
+
+    print(f"Imputing {len(predictions)} missing values into the new Series")
+
+    # 5. Fill the missing values in the Series
+    # Use the index of the identified rows to safely assign predictions
+    imputed_series.loc[imputation_rows_mask] = predictions
+
+    # 6. Return the resulting Series, renamed
+    return imputed_series

@@ -550,3 +550,127 @@ def plot_interactive_regression_with_color(
     fig.update_yaxes(showgrid=True, gridcolor='lightgray')
 
     fig.show()
+
+
+def plotlystuff(datasets, colnames, chrttypes=None, datatitles=None, chrttitle='', colors=None,
+                two_yaxes=False, axisdesig=None, axislabels=['Levels', 'Barometric Pressure'], opac=None, 
+                plot_height=300):
+    '''Plots one or more datasets on a shared set of axes
+    datasets: list of one or more datasets to plot, must have datetime index
+    colnames: list of one or more column names to plot on the y-axis; must be one column name per dataset
+    chrttypes: list of types of characters to plot; defaults to line; can include lines and markers (points)
+    colors: list of colors to use in plots; defaults to ['#228B22', '#FF1493', '#5acafa', '#663399', '#FF0000']
+    two_yaxes: presumably whether data should show up with two axes or one
+    axisdesig:uncertain
+    axislabels: list of names to for legend to label y-value on each dataset
+    opac:list of values for opacity setting of datasets; default is 0.8
+    plot_height: integer value for height of plot; default is 300
+    '''
+    
+    if chrttypes is None:
+        chrttypes = ['lines'] * len(datasets)
+
+    if opac is None:
+        opac = [0.8] * len(datasets)
+        
+    if datatitles is None:
+        datatitles = colnames
+    
+    if axisdesig is None:
+        axisdesig = ['y1'] * len(datasets)
+        
+    if colors is None:
+        if len(datasets) <= 5: 
+            colors = ['#228B22', '#FF1493', '#5acafa', '#663399', '#FF0000']
+        else:
+            colors = []
+            for i in range(len(datasets)):
+                colors.append('#{:02x}{:02x}{:02x}'.format(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
+    
+    modetypes = ['markers', 'lines+markers', 'lines']
+    datum = {}
+    
+    # Plotting the line charts for the datasets
+    for i in range(len(datasets)):
+        datum['d' + str(i)] = go.Scatter(
+            x=datasets[i].index,
+            y=datasets[i][colnames[i]],
+            name=datatitles[i],
+            line=dict(color=colors[i]),
+            mode=chrttypes[i],
+            opacity=opac[i],
+            yaxis=axisdesig[i]
+        )
+    
+    # Combine the data for plotting
+    data = list(datum.values())
+
+    # Calculate dynamic y-axis range
+    y_min = min([datasets[i][colnames[i]].min() for i in range(len(datasets))])
+    y_max = max([datasets[i][colnames[i]].max() for i in range(len(datasets))])
+    
+    # Layout definition with adjustments for vertical space and axis range
+    layout = dict(
+        title=chrttitle,
+        xaxis=dict(
+            rangeslider=dict(visible=True),
+            type='date',
+            tickformat='%Y-%m-%d %H:%M'
+        ),
+        yaxis=dict(
+            title=axislabels[0],
+            titlefont=dict(color='#1f77b4'),
+            tickfont=dict(color='#1f77b4'),
+            range=[y_min, y_max]  # Set dynamic y-axis range
+        ),
+        height=plot_height,  # Increase the height for more vertical space
+        margin=dict(t=50, b=50, l=60, r=60)  # Adjust margins
+    )
+    
+    if two_yaxes:
+        layout['yaxis2'] = dict(
+            title=axislabels[1],
+            titlefont=dict(color='#ff7f0e'),
+            tickfont=dict(color='#ff7f0e'),
+            anchor='x',
+            overlaying='y',
+            side='right',
+            position=0.15
+        )
+
+    fig = dict(data=data, layout=layout)
+    iplot(fig, filename='well')
+    return
+
+
+def compare_to_sig_strength(df, var, signal_var='H2O_SIG_STRGTH_MIN', cutoff=0.8, scaling_factor=1, sig_plot=False):
+    '''
+    Create plotlystuff plots to view all data for a variable over time and 
+    values for that variable when the signal strength is below the indicated 
+    cutoff value.
+
+    Args:
+    df (pd.DataFrame): Dataframe with datetime index.
+    var (str): Name of variable to plot
+    signal_var (str): Name of variable representing signal strength to plot
+        Should be either H2O_SIG_STRGTH_MIN or CO2_SIG_STRGTH_MIN
+    cutoff (float): Cutoff value to investigate for signal strength
+    scaling_factor (int): value to scale the signal_var by so that signal 
+        strength and variable of interest can be co-plot
+    sig_plot (bolean): If True, will plot second plot showing variable alongside 
+        scaled signal strength
+    """
+
+
+    '''
+    temp = df.copy()
+    sig_name = f'{signal_var}_SCALED'
+    temp[sig_name] = temp[signal_var]*scaling_factor
+    mask = temp[signal_var]<cutoff
+    var_name = f'{var}_BELOW_CUTOFF'
+    temp[var_name] = temp[var]
+    temp.loc[~mask, var_name] = np.nan
+    if sig_plot:
+        plotlystuff([temp, temp, temp], [var, var_name, sig_name], chrttitle=f'{var} with {cutoff} cutoff')
+    plotlystuff([temp, temp], [var, var_name], chrttitle=f'{var} with {cutoff} cutoff')
+    return(temp)
