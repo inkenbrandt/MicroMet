@@ -2,6 +2,7 @@
 This module provides the Reformatter class for cleaning and standardizing
 station data for flux/met processing, with integrated timestamp alignment checks.
 """
+
 from __future__ import annotations
 
 import logging
@@ -98,7 +99,7 @@ class Reformatter:
         """
         self.logger = logger_check(logger)
         self.config = reformatter_vars.config
-        
+
         if var_limits_csv is None:
             self.varlimits = variable_limits.limits
         else:
@@ -114,7 +115,7 @@ class Reformatter:
         self.site_lat = site_lat
         self.site_lon = site_lon
         self.site_utc_offset = site_utc_offset
-        
+
         # Validate timestamp check parameters
         if self.check_timestamps:
             if any(x is None for x in [site_lat, site_lon, site_utc_offset]):
@@ -126,6 +127,59 @@ class Reformatter:
     def prepare(self, df, data_type="eddy"):
         """Current method - keep for backward compatibility"""
         return self.process(df, data_type=data_type)
+
+    def preprocess(self, df, data_type="eddy", interval=30):
+        """
+        Preprocess the data by applying initial cleaning and standardization steps.
+        """
+        self.logger.info("Starting reformat (%s rows)", len(df))
+
+        # Standard pipeline
+        df = df.pipe(transformers.fix_timestamps, logger=self.logger)
+        df = df.pipe(
+            transformers.rename_columns,
+            data_type=data_type,
+            config=self.config,
+            logger=self.logger,
+        )
+        df = df.pipe(transformers.make_unique_cols)
+        df = df.pipe(transformers.set_number_types, logger=self.logger)
+        df = df.pipe(
+            transformers.resample_timestamps, interval=interval, logger=self.logger
+        )
+        df = df.pipe(transformers.timestamp_reset, minutes=interval)
+        return df
+
+    def finalize(self, df):
+        """
+        Finalize the data by applying cleaning and standardization steps.
+        """
+
+        df = df.pipe(transformers.fill_na_drop_dups)
+
+        df = df.pipe(transformers.apply_fixes, logger=self.logger)
+        # note that important to apply_fixes and rename_columns before running physical limits!
+        df, mask, report = transformers.apply_physical_limits(df)
+
+        # Timestamp alignment check (if enabled and radiation data available)
+        timestamp_results = None
+        if self.check_timestamps:
+            timestamp_results = self._check_timestamp_alignment(df)
+
+        if self.drop_soil:
+            df = df.pipe(
+                transformers.drop_extra_soil_columns,
+                config=self.config,
+                logger=self.logger,
+            )
+
+        df = df.pipe(transformers.drop_extras, config=self.config).fillna(
+            transformers.MISSING_VALUE
+        )
+        df = df.pipe(transformers.col_order, logger=self.logger)
+
+        self.logger.info("Done; final shape: %s", df.shape)
+        return df, report, timestamp_results
 
     def process(
         self, df: pd.DataFrame, interval: int, data_type: str = "eddy"
@@ -163,11 +217,17 @@ class Reformatter:
 
         # Standard pipeline
         df = df.pipe(transformers.fix_timestamps, logger=self.logger)
-        df = df.pipe(transformers.rename_columns, data_type=data_type, 
-                     config=self.config, logger=self.logger)
+        df = df.pipe(
+            transformers.rename_columns,
+            data_type=data_type,
+            config=self.config,
+            logger=self.logger,
+        )
         df = df.pipe(transformers.make_unique_cols)
         df = df.pipe(transformers.set_number_types, logger=self.logger)
-        df = df.pipe(transformers.resample_timestamps, interval=interval, logger=self.logger)
+        df = df.pipe(
+            transformers.resample_timestamps, interval=interval, logger=self.logger
+        )
         df = df.pipe(transformers.timestamp_reset, minutes=interval)
         df = df.pipe(transformers.fill_na_drop_dups)
 
@@ -181,8 +241,11 @@ class Reformatter:
             timestamp_results = self._check_timestamp_alignment(df)
 
         if self.drop_soil:
-            df = df.pipe(transformers.drop_extra_soil_columns, 
-                        config=self.config, logger=self.logger)
+            df = df.pipe(
+                transformers.drop_extra_soil_columns,
+                config=self.config,
+                logger=self.logger,
+            )
 
         df = df.pipe(transformers.drop_extras, config=self.config).fillna(
             transformers.MISSING_VALUE
@@ -196,7 +259,7 @@ class Reformatter:
         """
         Perform timestamp alignment analysis on radiation data.
 
-        This method analyzes SW_IN and/or PPFD_IN against theoretical 
+        This method analyzes SW_IN and/or PPFD_IN against theoretical
         top-of-atmosphere radiation to detect potential timestamp issues
         such as timezone errors, DST problems, or sensor issues.
 
@@ -215,18 +278,18 @@ class Reformatter:
             Returns None if radiation columns are not available.
         """
         # Check if we have the necessary radiation columns
-        has_sw = 'SW_IN' in df.columns or 'SW_IN_1_1_1' in df.columns
-        has_ppfd = 'PPFD_IN' in df.columns or 'PPFD_IN_1_1_1' in df.columns
-        
+        has_sw = "SW_IN" in df.columns or "SW_IN_1_1_1" in df.columns
+        has_ppfd = "PPFD_IN" in df.columns or "PPFD_IN_1_1_1" in df.columns
+
         if not (has_sw or has_ppfd):
             self.logger.warning(
                 "SW_IN and PPFD_IN not found in data; "
                 "skipping timestamp alignment check"
             )
             return None
-        
+
         self.logger.info("Performing timestamp alignment analysis...")
-        
+
         try:
             # Run the analysis
             summary, composites = analyze_timestamp_alignment(
@@ -234,15 +297,15 @@ class Reformatter:
                 lat=self.site_lat,
                 lon=self.site_lon,
                 std_utc_offset_hours=self.site_utc_offset,
-                time_from='END',  # Since we use TIMESTAMP_END
-                sw_col='SW_IN' if 'SW_IN' in df.columns else 'SW_IN_1_1_1',
-                ppfd_col='PPFD_IN' if 'PPFD_IN' in df.columns else 'PPFD_IN_1_1_1',
+                time_from="END",  # Since we use TIMESTAMP_END
+                sw_col="SW_IN" if "SW_IN" in df.columns else "SW_IN_1_1_1",
+                ppfd_col="PPFD_IN" if "PPFD_IN" in df.columns else "PPFD_IN_1_1_1",
                 assume_naive_is_local=False,
             )
-            
+
             # Flag potential issues
             flags = flag_issues(summary)
-            
+
             # Log any detected issues
             if flags:
                 self.logger.warning("Timestamp alignment issues detected:")
@@ -250,13 +313,9 @@ class Reformatter:
                     self.logger.warning(f"  {issue_type}: {message}")
             else:
                 self.logger.info("No significant timestamp alignment issues detected")
-            
-            return {
-                'summary': summary,
-                'composites': composites,
-                'flags': flags
-            }
-            
+
+            return {"summary": summary, "composites": composites, "flags": flags}
+
         except Exception as e:
             self.logger.error(f"Error during timestamp alignment check: {e}")
             return None
