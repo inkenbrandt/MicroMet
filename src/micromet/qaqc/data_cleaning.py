@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import Union
 
-def prep_parquet(station, df, install_date):
+def prep_parquet(station, df):
     not_subset = ['TIMESTAMP_START', 'TIMESTAMP_END',
                'FC_SSITC_TEST', 'LE_SSITC_TEST', 
                'ET_SSITC_TEST', 'H_SSITC_TEST','TAU_SSITC_TEST' ]
