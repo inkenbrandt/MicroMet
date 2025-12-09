@@ -4,8 +4,10 @@ import numpy as np
 
 def correct_vars_by_factor(df, correction_factor=0.05/0.16, 
                            vars_to_correct=['SG_1_1_1','SG_2_1_1'], 
-                           min_correction_date=pd.to_datetime('2010-01-01'),
-                           max_correction_date=pd.to_datetime('2030-01-01')):
+                           min_correction_date='2010-01-01',
+                           max_correction_date='2030-01-01'):
+                           
+                        
     """
     Applies a multiplicative correction factor to specified variables within a 
     defined time window.
@@ -21,9 +23,9 @@ def correct_vars_by_factor(df, correction_factor=0.05/0.16,
         Default is 0.05 / 0.16.
     vars_to_correct : list of str, optional
         List of column names to apply the correction to.
-    min_correction_date : datetime, optional
+    min_correction_date : str, optional
         Start date (inclusive) for the correction window.
-    max_correction_date : datetime, optional
+    max_correction_date : str, optional
         End date (inclusive) for the correction window.
 
     Returns
@@ -33,6 +35,8 @@ def correct_vars_by_factor(df, correction_factor=0.05/0.16,
         range.
     """
     df_out = df.copy()
+    min_correction_date = pd.to_datetime(min_correction_date)
+    max_correction_date = pd.to_datetime(max_correction_date)
     mask = (df_out.index >= min_correction_date) & (
         df_out.index<=max_correction_date)
     df_out.loc[mask, vars_to_correct] = df_out.loc[
@@ -93,7 +97,7 @@ def calculate_new_g_value(df, plate_num):
     # Mask identifies records where G will become missing because G_PLATE or SG is missing,
     # but G currently has a value. This is purely for the print statement.
     mask = ((df_out[col_g_plate].isna()) | (df_out[col_sg].isna())) & (
-        ~df_out[col_g].isna()
+        df_out[col_g].notna()
     )
     print(f'{mask.sum()} new records will having missing G values b/c SG or G_PLATE missing') 
     
@@ -125,9 +129,6 @@ def calc_mean_value_for_soil(df, var='G'):
     col2 = f'{var}_2_1_1'
     col_mean = f'{var}_1_1_A'
     
-    # FIX 1: Corrected the mask to check col1 AND col2 (it was checking col1 twice)
-    # This mask is for the print statement, checking if mean will become NaN when it 
-    # previously had a value.
     mask_print = ((df_out[col1].isna()) | (df_out[col2].isna())) & (
         ~df_out[col_mean].isna()
     )

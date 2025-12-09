@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from scipy import stats
 import pandas as pd
 from scipy.stats import linregress
+import random
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -420,8 +421,6 @@ def plot_wind_rose_from_df(df, wd_col, ws_col, title=None, save_path=None):
     plt.show()
 
 
-
-
 def plot_interactive_regression_with_color(
     
     df: pd.DataFrame,
@@ -556,6 +555,7 @@ def plotlystuff(datasets, colnames, chrttypes=None, datatitles=None, chrttitle='
                 two_yaxes=False, axisdesig=None, axislabels=['Levels', 'Barometric Pressure'], opac=None, 
                 plot_height=300):
     '''Plots one or more datasets on a shared set of axes
+
     datasets: list of one or more datasets to plot, must have datetime index
     colnames: list of one or more column names to plot on the y-axis; must be one column name per dataset
     chrttypes: list of types of characters to plot; defaults to line; can include lines and markers (points)

@@ -2,17 +2,11 @@ import pandas as pd
 import numpy as np
 from typing import Union
 
-def prep_parquet(station, df):
-    not_subset = ['TIMESTAMP_START', 'TIMESTAMP_END',
-               'FC_SSITC_TEST', 'LE_SSITC_TEST', 
-               'ET_SSITC_TEST', 'H_SSITC_TEST','TAU_SSITC_TEST' ]
-    
+def prep_parquet(station, df):    
     df = df.loc[station]
     df = df.replace(-9999, np.nan)
-    filtered_cols = [col for col in df.columns if col not in not_subset]
     df = df.dropna(axis=1, how='all')
     df = df.sort_index()
-
     return(df)
 
 def set_range_to_nan(
