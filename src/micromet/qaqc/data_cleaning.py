@@ -207,6 +207,30 @@ from sklearn.linear_model import LinearRegression
 import numpy as np
 from typing import Tuple, Dict, Any
 
+def mask_wind_direction(df, wd_col, start_deg, end_deg):
+    """
+    Creates a boolean mask for bad wind directions.
+    
+    Parameters:
+    df (pd.DataFrame): Your dataset.
+    wd_col (str): Name of the wind direction column (0-360).
+    start_deg (float): The start of the exclusion zone (clockwise).
+    end_deg (float): The end of the exclusion zone (clockwise).
+    
+    Returns:
+    pd.Series: A boolean mask where True = BAD data (inside the zone).
+    """
+    wd = df[wd_col]
+    
+    if start_deg <= end_deg:
+        # Standard case: e.g., 90 to 180 (East to South)
+        mask = (wd >= start_deg) & (wd <= end_deg)
+    else:
+        # Wrap-around case: e.g., 350 to 20 (Northwest to Northeast)
+        mask = (wd >= start_deg) | (wd <= end_deg)
+        
+    return mask
+
 def mask_by_rolling_window(
     df: pd.DataFrame,
     sig_col: str = 'H2O_SIG_STRGTH_MIN',
