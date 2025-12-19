@@ -674,3 +674,105 @@ def compare_to_sig_strength(df, var, signal_var='H2O_SIG_STRGTH_MIN', cutoff=0.8
         plotlystuff([temp, temp, temp], [var, var_name, sig_name], chrttitle=f'{var} with {cutoff} cutoff')
     plotlystuff([temp, temp], [var, var_name], chrttitle=f'{var} with {cutoff} cutoff')
     return(temp)
+
+
+def plot_flux_vs_ustar(
+    df: pd.DataFrame, 
+    mode: str = 'night',
+    ustar_col: str = 'USTAR', 
+    le_col: str = 'LE_1_1_1', 
+    h_col: str = 'H_1_1_1', 
+    netrad_col: str = 'NETRAD_1_1_2'
+) -> None:
+    r"""
+    Plot Latent Heat (LE), Sensible Heat (H), and their sum vs Friction Velocity (u*).
+
+    This diagnostic tool bins turbulent fluxes by atmospheric turbulence levels
+    to identify the u* threshold and detect advective conditions (Oasis Effect).
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe with a DatetimeIndex and required flux columns.
+    mode : {'day', 'night'}, default 'night'
+        Filter for the analysis. 'day' uses Rn > 10 W/m², 'night' uses Rn <= 10 W/m².
+    ustar_col : str, default 'USTAR'
+        Column name for friction velocity [m/s].
+    le_col : str, default 'LE_1_1_1'
+        Column name for Latent Heat Flux [W/m²].
+    h_col : str, default 'H_1_1_1'
+        Column name for Sensible Heat Flux [W/m²].
+    netrad_col : str, default 'NETRAD_1_1_2'
+        Column name for Net Radiation [W/m²] used for day/night partitioning.
+
+    Notes
+    -----
+    **Why this is important:**
+    1. **u* Threshold Detection:** Under low turbulence (typically night), 
+       measured fluxes often underestimate the true exchange. By plotting 
+       Flux vs. $u_*$, we look for the "plateau"—the $u_*$ value where the 
+       flux becomes independent of wind speed. This is your $u_*$ filter 
+       cutoff.
+    
+    2. **The Oasis Effect:** In irrigated fields or wetlands surrounded by 
+       dry areas, LE can exceed Net Radiation ($R_n$). This plot helps identify 
+       if negative Sensible Heat ($H < 0$) is "feeding" evaporation, a classic 
+       indicator of regional advection.
+    
+    3. **Energy Balance Verification:** Monitoring the sum $(H + LE)$ relative 
+       to $u_*$ helps determine if the "missing energy" in your balance is 
+       correlated with poor mixing or specific wind conditions.
+    """
+    # 1. Filter data
+    if mode.lower() == 'day':
+        subset = df[df[netrad_col] > 10].copy()
+        title_str = "Daytime ($R_n > 10$)"
+    else:
+        subset = df[df[netrad_col] <= 10].copy()
+        title_str = "Nighttime ($R_n \leq 10$)"
+        
+    if subset.empty:
+        print("No data found for this mode.")
+        return
+
+    # Calculate Turbulent Sum
+    subset['Sum_H_LE'] = subset[le_col] + subset[h_col]
+
+    # 2. Binning
+    u_max = subset[ustar_col].quantile(0.99)
+    bins = np.arange(0, u_max + 0.05, 0.05)
+    subset['bin'] = pd.cut(subset[ustar_col], bins=bins)
+    
+    stats = subset.groupby('bin', observed=True).agg({
+        ustar_col: 'mean',
+        le_col: ['mean', 'std'],
+        h_col: ['mean', 'std'],
+        'Sum_H_LE': ['mean', 'std']
+    }).dropna()
+    stats.columns = ['ustar_mean', 'le_mean', 'le_std', 'h_mean', 'h_std', 'sum_mean', 'sum_std']
+
+    # 3. Plotting
+    plt.figure(figsize=(10, 7))
+    
+    # Raw Data (faded scatter)
+    plt.scatter(subset[ustar_col], subset[le_col], color='blue', alpha=0.03, s=2)
+    plt.scatter(subset[ustar_col], subset[h_col], color='red', alpha=0.03, s=2)
+    plt.scatter(subset[ustar_col], subset['Sum_H_LE'], color='green', alpha=0.03, s=2)
+    
+    # Binned Averages with Error Bars
+    plt.errorbar(stats['ustar_mean'], stats['le_mean'], yerr=stats['le_std'], 
+                 fmt='o-', color='darkblue', capsize=3, label=r'$LE \pm \sigma$')
+    plt.errorbar(stats['ustar_mean'], stats['h_mean'], yerr=stats['h_std'], 
+                 fmt='s-', color='darkred', capsize=3, label=r'$H \pm \sigma$')
+    plt.errorbar(stats['ustar_mean'], stats['sum_mean'], yerr=stats['sum_std'], 
+                 fmt='d-', color='green', capsize=3, label=r'$(H+LE) \pm \sigma$')
+    
+    plt.axhline(0, color='black', linewidth=1)
+    plt.title(f"Energy Components vs. $u_*$: {title_str}", fontsize=14)
+    plt.xlabel(r'$u_*$ (m s$^{-1}$)', fontsize=12)
+    plt.ylabel(r'Flux (W m$^{-2}$)', fontsize=12)
+    plt.grid(True, linestyle=':', alpha=0.6)
+    plt.legend(loc='best', fontsize=9)
+    
+    plt.tight_layout()
+    plt.show()

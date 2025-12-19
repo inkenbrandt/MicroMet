@@ -207,6 +207,70 @@ from sklearn.linear_model import LinearRegression
 import numpy as np
 from typing import Tuple, Dict, Any
 
+def mask_by_rolling_window(
+    df: pd.DataFrame,
+    sig_col: str = 'H2O_SIG_STRGTH_MIN',
+    rolling_window: int = 8,
+    threshold_value: float = 0.8,
+    threshold_direction: str = 'gt'
+) -> pd.Series:
+    """
+    Create a boolean mask based on a rolling average of a signal column.
+
+    This function is commonly used in flux processing (like Eddy Covariance) 
+    to filter out data periods where the instrument signal strength (e.g., AGC 
+    or RSSI) drops below a quality threshold, smoothed over a specific window 
+    to prevent over-flagging transient spikes.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe containing the signal strength column.
+    sig_col : str, default 'H2O_SIG_STRGTH_MIN'
+        The column name to perform the rolling average and thresholding on.
+    rolling_window : int, default 8
+        The size of the moving window (number of periods) for the mean calculation.
+    threshold_value : float, default 0.8
+        The numerical value used to determine the mask boundary.
+    threshold_direction : {'gt', 'lt'}, default 'gt'
+        The comparison operator for the threshold:
+        - 'gt': Mask is True where rolling average is Greater Than threshold.
+        - 'lt': Mask is True where rolling average is Less Than threshold.
+
+    Returns
+    -------
+    pd.Series
+        A boolean Series (mask) where True indicates the data passed the 
+        threshold criteria and False indicates it should be filtered out.
+
+    Notes
+    -----
+    The rolling window is centered (`center=True`), meaning the average for 
+    any given point is calculated using both preceding and following data.
+    """
+    df2 = df.copy()
+    
+    # Calculate smoothed signal
+    df2['Signal_Rolling'] = df2[sig_col].rolling(
+        window=rolling_window, 
+        center=True
+    ).mean()
+    
+    # Determine masking logic
+    if threshold_direction == 'gt':
+        mask = df2['Signal_Rolling'] > threshold_value
+    elif threshold_direction == 'lt':
+        mask = df2['Signal_Rolling'] < threshold_value
+    else:
+        raise ValueError("threshold_direction must be either 'lt' or 'gt'")
+
+    # Report masking statistics
+    num_masked = len(mask[mask == False])
+    print(f"Masking Report: {num_masked} of {len(df)} points ({num_masked/len(df):.1%}) outside threshold.")
+    
+    return mask
+
+
 def train_linear_regression_model(
     df: pd.DataFrame, 
     target_col: str, 
