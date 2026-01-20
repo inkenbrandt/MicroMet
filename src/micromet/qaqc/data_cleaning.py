@@ -231,69 +231,171 @@ def mask_wind_direction(df, wd_col, start_deg, end_deg):
         
     return mask
 
-def mask_by_rolling_window(
+def mask_by_rolling_window_combined(
     df: pd.DataFrame,
     sig_col: str = 'H2O_SIG_STRGTH_MIN',
-    rolling_window: int = 8,
+    rolling_window: int = 9,
     threshold_value: float = 0.8,
-    threshold_direction: str = 'gt'
 ) -> pd.Series:
     """
-    Create a boolean mask based on a rolling average of a signal column.
+    Create a robust quality mask using instant and smoothed signal thresholds.
 
-    This function is commonly used in flux processing (like Eddy Covariance) 
-    to filter out data periods where the instrument signal strength (e.g., AGC 
-    or RSSI) drops below a quality threshold, smoothed over a specific window 
-    to prevent over-flagging transient spikes.
+    This function implements a 'dual-condition' filter to identify poor instrument 
+    performance (e.g., AGC or RSSI drops). It protects against over-masking 
+    transient spikes by requiring both the instantaneous signal AND a centered 
+    rolling median to fall below the threshold before a point is rejected.
 
     Parameters
     ----------
     df : pd.DataFrame
-        Input dataframe containing the signal strength column.
+        The input dataframe containing the signal strength telemetry.
     sig_col : str, default 'H2O_SIG_STRGTH_MIN'
-        The column name to perform the rolling average and thresholding on.
-    rolling_window : int, default 8
-        The size of the moving window (number of periods) for the mean calculation.
+        The name of the column to evaluate.
+    rolling_window : int, default 9
+        The size of the moving window (number of periods). An odd integer is 
+        recommended to ensure the window is perfectly centered on the timestamp.
     threshold_value : float, default 0.8
-        The numerical value used to determine the mask boundary.
-    threshold_direction : {'gt', 'lt'}, default 'gt'
-        The comparison operator for the threshold:
-        - 'gt': Mask is True where rolling average is Greater Than threshold.
-        - 'lt': Mask is True where rolling average is Less Than threshold.
+        The minimum acceptable signal strength. Values below this are 
+        considered potential failures.
 
     Returns
     -------
     pd.Series
-        A boolean Series (mask) where True indicates the data passed the 
-        threshold criteria and False indicates it should be filtered out.
+        A boolean Series (mask) where True indicates 'Good Data' (Keep) 
+        and False indicates 'Bad Data' (Filter).
 
     Notes
     -----
-    The rolling window is centered (`center=True`), meaning the average for 
-    any given point is calculated using both preceding and following data.
+    - Robustness: Uses a rolling median rather than a mean to ignore 
+      short-duration impulse noise (spikes) within the window.
+    - Logic: A data point is masked ONLY if:
+        (Instant Signal < Threshold) AND (Rolling Median < Threshold).
+    - Edge Handling: Uses `min_periods=1` to ensure valid masking at the 
+      beginning and end of the dataset.
+    - Missing Data: Existing NaN values in `sig_col` are excluded from the 
+      printed quality report to provide an accurate 'dropped points' percentage.
     """
-    df2 = df.copy()
-    
-    # Calculate smoothed signal
-    df2['Signal_Rolling'] = df2[sig_col].rolling(
+    # 1. Calculate the smoothed signal 
+    rolling_sig = df[sig_col].rolling(
         window=rolling_window, 
-        center=True
-    ).mean()
+        center=True, 
+        min_periods=1
+    ).median()
     
-    # Determine masking logic
-    if threshold_direction == 'gt':
-        mask = df2['Signal_Rolling'] > threshold_value
-    elif threshold_direction == 'lt':
-        mask = df2['Signal_Rolling'] < threshold_value
-    else:
-        raise ValueError("threshold_direction must be either 'lt' or 'gt'")
+    # 2. Define the two conditions
+    # True if the signal is "Good"
+    instant_pass = df[sig_col] >= threshold_value
+    rolling_pass = rolling_sig >= threshold_value
+    
+    # 3. Combined Logic: 
+    # We keep the data if the instant signal is good OR if the window says it's okay.
+    # This means we ONLY drop if BOTH are bad.
+    mask = instant_pass | rolling_pass
 
-    # Report masking statistics
-    num_masked = len(mask[mask == False])
-    print(f"Masking Report: {num_masked} of {len(df)} points ({num_masked/len(df):.1%}) outside threshold.")
+    # 4. Refined Reporting Logic
+    # We only care about rows where we actually HAD data to begin with
+    valid_data_indices = df[sig_col].notna()
+    
+    # Points that had data but were masked by our threshold logic
+    num_filtered = (~mask & valid_data_indices).sum()
+    total_valid = valid_data_indices.sum()
+    
+    if total_valid > 0:
+        print(f"Quality Control Report: {num_filtered} of {total_valid} valid points "
+              f"({num_filtered/total_valid:.1%}) dropped via threshold.")
+    else:
+        print("Quality Control Report: No valid data found in column.")
     
     return mask
+    
 
+import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
+
+
+import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
+
+def despike_data_nan_aware(data, filter_size=5, threshold_factor=3.0):
+    """
+    Remove outliers (spikes) from a 1D array using a NaN-aware median filter.
+
+    This function identifies spikes by comparing each data point to the median 
+    of its local neighborhood. It is specifically designed to handle arrays 
+    containing NaN values without allowing those NaNs to bias the filter or 
+    the noise statistics.
+
+    The process follows these steps:
+    1. Pads the data to handle edges using reflection.
+    2. Calculates a moving baseline using a sliding window median (ignoring NaNs).
+    3. Computes the residual noise and determines a threshold based on the 
+       standard deviation of that noise.
+    4. Replaces values exceeding the threshold with the local median.
+
+    Parameters
+    ----------
+    data : array_like
+        The input 1D signal or time-series data to be despiked. Can contain 
+        NaN values.
+    filter_size : int, optional
+        The size of the sliding window used to calculate the local median. 
+        Must be an odd integer. Default is 5.
+    threshold_factor : float, optional
+        The multiplier applied to the global standard deviation of the noise 
+        to determine the spike detection threshold. A higher value is less 
+        sensitive (detects fewer spikes). Default is 3.0.
+
+    Returns
+    -------
+    despiked_data : ndarray
+        A copy of the input data where identified spikes have been replaced 
+        by the local median. Original NaN values are preserved.
+    spike_mask : ndarray (bool)
+        A boolean mask of the same shape as `data`, where True indicates 
+        a detected spike location.
+
+    Notes
+    -----
+    - This function uses `np.nanmedian` and `np.nanstd`, which are 
+      computationally more expensive than their standard counterparts but 
+      necessary if the dataset is missing values.
+    - If a window consists entirely of NaNs, the resulting baseline value 
+      for that window will be NaN.
+
+    Examples
+    --------
+    >>> signal = [10, 11, 100, 12, np.nan, 11, 10]
+    >>> clean, mask = despike_data_nan_aware(signal, filter_size=3)
+    >>> clean
+    array([10., 11., 11., 12., nan, 11., 10.])
+    """
+    # Ensure data is a numpy array
+    data = np.asanyarray(data)
+    
+    # Create a padded version to handle edges
+    pad_size = filter_size // 2
+    padded_data = np.pad(data, pad_size, mode='reflect')
+    
+    # Create sliding windows
+    windows = sliding_window_view(padded_data, filter_size)
+    
+    # Calculate baseline using nanmedian (ignores NaNs)
+    baseline = np.nanmedian(windows, axis=1)
+    
+    # Calculate noise: Difference between original and baseline
+    noise = data - baseline
+    
+    # Calculate threshold using nanstd to ignore existing NaNs
+    threshold = threshold_factor * np.nanstd(noise)
+    
+    # Identify spikes (ignoring NaNs in the comparison)
+    spike_mask = np.abs(noise) > threshold
+    
+    # Replace spikes with baseline, but keep original NaNs as NaNs
+    despiked_data = data.copy()
+    despiked_data[spike_mask] = baseline[spike_mask]
+    
+    return despiked_data, spike_mask
 
 def train_linear_regression_model(
     df: pd.DataFrame, 

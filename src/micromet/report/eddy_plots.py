@@ -707,7 +707,7 @@ def plot_flux_vs_ustar(
 
     Notes
     -----
-    **Why this is important:**
+    **Why this is impfortant:**
     1. **u* Threshold Detection:** Under low turbulence (typically night), 
        measured fluxes often underestimate the true exchange. By plotting 
        Flux vs. $u_*$, we look for the "plateau"—the $u_*$ value where the 
