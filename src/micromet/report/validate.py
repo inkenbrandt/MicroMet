@@ -46,7 +46,18 @@ def validate_flags(df: pd.DataFrame,
     print(f"Checking columns: {flag_columns}")
     print(f"Allowed values: {allowed_set}")
 
-    for col in flag_columns:
+    ssitc_bases = [
+        "FC_SSITC_TEST",
+        "LE_SSITC_TEST",
+        "ET_SSITC_TEST",
+        "H_SSITC_TEST",
+        "TAU_SSITC_TEST",
+    ]
+    columns_to_check = [
+        col for col in df.columns 
+        if any(col.startswith(base) for base in ssitc_bases)
+    ]
+    for col in columns_to_check:
         if col not in df.columns:
             print(f"Warning: Column '{col}' not found in DataFrame.")
             continue

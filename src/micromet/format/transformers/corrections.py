@@ -122,13 +122,18 @@ def ssitc_scale(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     pd.DataFrame
         The DataFrame with SSITC columns scaled where applicable.
     """
-    ssitc_columns = [
+    ssitc_bases = [
         "FC_SSITC_TEST",
         "LE_SSITC_TEST",
         "ET_SSITC_TEST",
         "H_SSITC_TEST",
         "TAU_SSITC_TEST",
     ]
+    ssitc_columns = [
+        col for col in df.columns 
+        if any(col.startswith(base) for base in ssitc_bases)
+    ]
+
     for column in ssitc_columns:
         if column in df.columns:
             if df[column].max() > 3:
@@ -136,6 +141,7 @@ def ssitc_scale(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
                 logger.debug(f"Scaled SSITC {column}")
     logger.debug(f"Scaled SSITC len: {len(df)}")
     return df
+
 
 
 def scale_and_convert(column: pd.Series) -> pd.Series:
