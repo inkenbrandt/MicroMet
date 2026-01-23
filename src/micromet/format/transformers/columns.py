@@ -11,6 +11,20 @@ from typing import Dict
 
 import pandas as pd
 
+def create_suffix_map(df, col_list, suffix):
+    """
+    Filters a list of columns based on what's actually in the DataFrame,
+    then creates a dictionary for renaming with a user-provided suffix.
+    """
+    # 1. Only include columns that actually exist in your current dataframe
+    existing_cols = [col for col in col_list if col in df.columns]
+    
+    # 2. Create the renaming dictionary
+    # Example: 'CO2_SIGMA' -> 'CO2_SIGMA_1_1_1'
+    rename_dict = {col: f"{col}{suffix}" for col in existing_cols}
+    
+    return rename_dict
+
 
 # SoilVUE Depth/orientation conversion tables
 _DEPTH_MAP = {5: 1, 10: 2, 20: 3, 30: 4, 40: 5, 50: 6, 60: 7, 75: 8, 100: 9}

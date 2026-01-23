@@ -10,18 +10,18 @@ DATETIME_END
 """
 
 interval_update_dict = {
-    "US-UTE":	["10/9/2025 11:20",	"10/9/2025 11:20"], # verified; note that first ameriflux statistics record after break needs to be dropped
-    "US-UTJ":	["10/9/2025 12:04",	"10/9/2025 12:05"], # verified 10/28/2025
-    "US-UTB":	["10/9/2025 13:08",	None],
-    'US-UTD':   ["10/22/2025 16:30", "10/22/2025 16:30"], # verified that 30 minutes thru this date; could also check for hourly after this date
-    "US-CdM":	["10/9/2025 13:20",	"10/9/2025 13:27"], 
-    "US-UTM":	["10/9/2025 13:57",	"10/10/2025 8:15"], # DIFFERENT DAYS!
-    "US-UTW":	["10/10/2025 10:24", "10/10/2025 10:37"],
-    "US-UTV":	["10/14/25 6:22",	"10/14/2025 6:35"], # verified eddy time; met time is 11:35 but setting as same as eddy time and will resample met data to hourly
-    "US-UTP":	["10/13/25 12:13",	"10/13/2025 12:25"],
-    "US-UTL":	["10/10/25 13:58",	"10/10/25 13:58"], # verified
+    "US-UTE":	["10/9/2025 11:20",	"10/9/2025 11:20"], # VERIFIED; note that first ameriflux statistics record after break needs to be dropped
+    "US-UTJ":	["10/9/2025 12:04",	"10/9/2025 12:05"], # VERIFIED
+    "US-UTB":	["10/9/2025 13:08",	None], # VERIFIED
+    'US-UTD':   ["10/22/2025 16:30", "10/22/2025 16:30"], # VERIFIED
+    "US-CdM":	["10/9/2025 13:20",	"10/9/2025 13:27"], # VERIFIED
+    "US-UTM":	["10/9/2025 13:57",	"10/10/2025 8:15"], # DIFFERENT DAYS! verified eddy only
+    "US-UTW":	["10/10/2025 10:24", "10/10/2025 10:37"], # VERIFIED
+    "US-UTV":	["10/14/25 6:22",	"10/14/2025 6:35"], # VERIFIED; met time is 11:35 but setting as same as eddy time and will resample met data to hourly
+    "US-UTP":	["10/13/25 12:13",	"10/13/2025 12:25"], # VERIFIED
+    "US-UTL":	["10/10/25 13:58",	"10/10/25 13:58"], # VERIFIED
     "US-UTZ":	["10/10/25 1:46", None],
-    "US-UTG":	["10/10/2025 7:46",	"10/10/2025 7:54"]
+    "US-UTG":	["10/10/2025 7:46",	"10/10/2025 7:54"] # VERIFIED
 }
 
 from typing import Dict, List, Union
