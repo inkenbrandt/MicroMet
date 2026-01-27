@@ -472,7 +472,7 @@ def review_lags(data1, data2, max_lag=4):
         
         # Printing the results for quick review is maintained as requested
         if optimal_lag == 0 and max_correlation_value.round(3)==1:
-            print("Data identical")
+            print("Data close to identical")
         else:
             print(f"Optimal Lag: {optimal_lag} periods")
             print(f"Max Cross-Correlation: {max_correlation_value.round(3)}")

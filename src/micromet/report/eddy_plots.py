@@ -537,7 +537,6 @@ def plot_interactive_regression_with_color(
         yaxis_title=y_col,
         hovermode='closest',
         plot_bgcolor='white',
-        # --- KEY CHANGE: Set width and height to the same value ---
         width=plot_size,
         height=plot_size,
         # --------------------------------------------------------

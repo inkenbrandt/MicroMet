@@ -15,7 +15,7 @@ interval_update_dict = {
     "US-UTB":	["10/9/2025 13:08",	None], # VERIFIED
     'US-UTD':   ["10/22/2025 16:30", "10/22/2025 16:30"], # VERIFIED
     "US-CdM":	["10/9/2025 13:20",	"10/9/2025 13:27"], # VERIFIED
-    "US-UTM":	["10/9/2025 13:57",	"10/10/2025 8:15"], # DIFFERENT DAYS! verified eddy only
+    "US-UTM":	["10/9/2025 13:57",	"10/10/2025 8:15"], # DIFFERENT DAYS! VERIFIED eddy only
     "US-UTW":	["10/10/2025 10:24", "10/10/2025 10:37"], # VERIFIED
     "US-UTV":	["10/14/25 6:22",	"10/14/2025 6:35"], # VERIFIED; met time is 11:35 but setting as same as eddy time and will resample met data to hourly
     "US-UTP":	["10/13/25 12:13",	"10/13/2025 12:25"], # VERIFIED
