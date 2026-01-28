@@ -349,8 +349,8 @@ limits = {
     "SG": {
         "Description": "Heat storage flux in the soil above the soil heat fluxes measurement",
         "Units": "W m-2",
-        "Min": -300.0,
-        "Max": 750.0,
+        "Min": -100.0,
+        "Max": 250.0,
     },
     "SH": {
         "Description": "Sensible heat (H) storage flux",
