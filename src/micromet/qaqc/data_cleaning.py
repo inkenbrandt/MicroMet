@@ -275,6 +275,7 @@ def mask_by_rolling_window_combined(
     - Missing Data: Existing NaN values in `sig_col` are excluded from the 
       printed quality report to provide an accurate 'dropped points' percentage.
     """
+
     # 1. Calculate the smoothed signal 
     rolling_sig = df[sig_col].rolling(
         window=rolling_window, 
@@ -313,8 +314,6 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
 
-import numpy as np
-from numpy.lib.stride_tricks import sliding_window_view
 
 def despike_data_nan_aware(data, filter_size=5, threshold_factor=3.0):
     """
@@ -371,6 +370,11 @@ def despike_data_nan_aware(data, filter_size=5, threshold_factor=3.0):
     """
     # Ensure data is a numpy array
     data = np.asanyarray(data)
+
+    if filter_size % 2 == 0:
+        old_size = filter_size
+        filter_size += 1
+        print(f"filter_size {old_size} is even; incrementing to {filter_size} to ensure array alignment.")
     
     # Create a padded version to handle edges
     pad_size = filter_size // 2
