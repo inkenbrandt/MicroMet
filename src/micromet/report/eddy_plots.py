@@ -38,37 +38,41 @@ def create_grouped_boxplot(df, value_col, category_col):
         category_hover_text = ["Index: {}".format(i) for i in category_data.index]
 
         # Add a Box trace for the current category
-        fig.add_trace(go.Box(
-            # X-axis is the category
-            x=[category] * len(category_data),
-            # Y-axis is the numeric value
-            y=category_data[value_col],
-            name=str(category), # Set the trace name to the category
-            boxpoints='all',
-            # Assign the custom hover text
-            text=category_hover_text,
-            # Configure the hover label template
-            hovertemplate=(
-                f'{category_col}: {category}<br>' +
-                f'{value_col}: ' + '%{y}<br>' +
-                '%{text}<br>' +
-                '<extra></extra>'
+        fig.add_trace(
+            go.Box(
+                # X-axis is the category
+                x=[category] * len(category_data),
+                # Y-axis is the numeric value
+                y=category_data[value_col],
+                name=str(category),  # Set the trace name to the category
+                boxpoints="all",
+                # Assign the custom hover text
+                text=category_hover_text,
+                # Configure the hover label template
+                hovertemplate=(
+                    f"{category_col}: {category}<br>"
+                    + f"{value_col}: "
+                    + "%{y}<br>"
+                    + "%{text}<br>"
+                    + "<extra></extra>"
+                ),
             )
-        ))
+        )
 
     # Layout Customization
     fig.update_layout(
-        title=f'Boxplots of {value_col} Grouped by {category_col}',
+        title=f"Boxplots of {value_col} Grouped by {category_col}",
         xaxis_title=category_col,
         yaxis_title=value_col,
-        boxgap=0.2
+        boxgap=0.2,
     )
 
     return fig
 
+
 ## this is an old versoi of this plot that I used for the May 2025 comparisons!
-def ols_plot(x, y,xlabel, ylabel, title):
-    '''
+def ols_plot(x, y, xlabel, ylabel, title):
+    """
     Create a scatterplot between two arrays, `x` and `y`, visualizing their relationship
     along with an Ordinary Least Squares (OLS) regression line and a 1:1 reference line.
 
@@ -98,8 +102,8 @@ def ols_plot(x, y,xlabel, ylabel, title):
     ------------
     - matplotlib.pyplot as plt
     - numpy as np
-    - scipy.stats.linregress    '''
-    
+    - scipy.stats.linregress"""
+
     min_val = min(x.min(), y.min())
     max_val = max(x.max(), y.max())
 
@@ -107,20 +111,31 @@ def ols_plot(x, y,xlabel, ylabel, title):
 
     y_pred = slope * x + intercept
 
-    plt.figure(figsize=(10,5))
-    plt.plot(x, y_pred, color='red', label=f'Fit: y = {slope:.2f}x + {intercept:.2f}\nR2={round(r_value**2, 2)}')
-    plt.plot(np.arange(min_val,max_val,0.1),np.arange(min_val,max_val,0.1),color='black',linestyle=":",label='1:1 Line')
-    plt.scatter(x,y, label='Record', alpha=0.5)
+    plt.figure(figsize=(10, 5))
+    plt.plot(
+        x,
+        y_pred,
+        color="red",
+        label=f"Fit: y = {slope:.2f}x + {intercept:.2f}\nR2={round(r_value**2, 2)}",
+    )
+    plt.plot(
+        np.arange(min_val, max_val, 0.1),
+        np.arange(min_val, max_val, 0.1),
+        color="black",
+        linestyle=":",
+        label="1:1 Line",
+    )
+    plt.scatter(x, y, label="Record", alpha=0.5)
     plt.grid(True)
-    plt.xlabel(f'{xlabel}')
-    plt.ylabel(f'{ylabel}')
-    plt.title(f'{title}')
+    plt.xlabel(f"{xlabel}")
+    plt.ylabel(f"{ylabel}")
+    plt.title(f"{title}")
     plt.legend()
 
 
 # this plot is a great way to view how residuals in a linear model vary over time
 def student_resid_plot(df, var1, var2, title):
-    '''
+    """
     Generates an interactive scatter plot of studentized residuals from an OLS regression.
 
     This function performs a simple Ordinary Least Squares (OLS) regression using `var1`
@@ -152,52 +167,62 @@ def student_resid_plot(df, var1, var2, title):
     - statsmodels.formula.api.ols
     - plotly.express as px
     - numpy as np (for np.abs)
-    '''
-    simple_regression_model = ols(f'{var2} ~ {var1}', data=df).fit()
+    """
+    simple_regression_model = ols(f"{var2} ~ {var1}", data=df).fit()
     stud_res = simple_regression_model.outlier_test()
     outlier_threshold = 1.96
 
-    fig = px.scatter(stud_res,
-        x=stud_res.index, 
-        y='student_resid',
-        hover_data={'Date': stud_res.index.strftime('%Y-%m-%d'),
-                    'Studentized Residual': stud_res['student_resid']},
-        height=350,
-        labels = {
-            stud_res.index.name: "Date",
-            'student_resid':'Studentized Residual'
+    fig = px.scatter(
+        stud_res,
+        x=stud_res.index,
+        y="student_resid",
+        hover_data={
+            "Date": stud_res.index.strftime("%Y-%m-%d"),
+            "Studentized Residual": stud_res["student_resid"],
         },
-        title=f'{title}'
+        height=350,
+        labels={stud_res.index.name: "Date", "student_resid": "Studentized Residual"},
+        title=f"{title}",
     )
 
-    fig.add_hline(y=outlier_threshold, line_dash="dash", line_color="red",
-                annotation_text=f"Outlier Threshold (+{outlier_threshold})",
-                annotation_position="top right")
-    fig.add_hline(y=-outlier_threshold, line_dash="dash", line_color="red",
-                annotation_text=f"Outlier Threshold (-{outlier_threshold})",
-                annotation_position="bottom right")
+    fig.add_hline(
+        y=outlier_threshold,
+        line_dash="dash",
+        line_color="red",
+        annotation_text=f"Outlier Threshold (+{outlier_threshold})",
+        annotation_position="top right",
+    )
+    fig.add_hline(
+        y=-outlier_threshold,
+        line_dash="dash",
+        line_color="red",
+        annotation_text=f"Outlier Threshold (-{outlier_threshold})",
+        annotation_position="bottom right",
+    )
 
     # Optionally, you can also mark individual outlier points if you want them to stand out
-    identified_outliers = stud_res[np.abs(stud_res['student_resid']) > outlier_threshold]
+    identified_outliers = stud_res[
+        np.abs(stud_res["student_resid"]) > outlier_threshold
+    ]
     if not identified_outliers.empty:
-        fig.add_scatter(x=identified_outliers.index, y=identified_outliers['student_resid'],
-                        mode='markers', name='Outliers', marker=dict(color='red', size=8, symbol='x'))
-        
-    fig.update_layout(
-        margin=dict(
-            l=20,  
-            r=20,  
-            b=20,  
-            t=50
+        fig.add_scatter(
+            x=identified_outliers.index,
+            y=identified_outliers["student_resid"],
+            mode="markers",
+            name="Outliers",
+            marker=dict(color="red", size=8, symbol="x"),
         )
-    )
+
+    fig.update_layout(margin=dict(l=20, r=20, b=20, t=50))
 
     fig.show()
 
 
 # this is the function I am using for the chapman conference
-def comparison_plot (df, var1, var2, title, xlabel, ylabel, output_path, print_plot=True):
-    '''
+def comparison_plot(
+    df, var1, var2, title, xlabel, ylabel, output_path, print_plot=True
+):
+    """
     Generates a scatter plot to compare two variables from a DataFrame, including a linear regression line and a 1:1 reference line.
 
     This function performs a linear regression on var1 (independent variable) and var2 (dependent variable), and visualizes the relationship. It drops any rows with missing values in these two columns before plotting. The plot includes several key features:
@@ -233,7 +258,7 @@ def comparison_plot (df, var1, var2, title, xlabel, ylabel, output_path, print_p
     numpy as np
     matplotlib.pyplot as plt
     scipy.stats as stats
-    '''
+    """
 
     scatterdf = df[[var1, var2]].dropna()
 
@@ -250,33 +275,37 @@ def comparison_plot (df, var1, var2, title, xlabel, ylabel, output_path, print_p
     print(f"P-value: {p_value}")
     print(f"Standard error of the estimate: {std_err}")
 
-
-
     # Plot the data and the regression line
-    plt.scatter(x, y, label='Data points', s=20, facecolors='none', edgecolors='blue')
-    plt.plot(x, slope * x + intercept, color='red')
+    plt.scatter(x, y, label="Data points", s=20, facecolors="none", edgecolors="blue")
+    plt.plot(x, slope * x + intercept, color="red")
 
-    linear_fit_label = f'Linear fit (Slope={slope:.2f}, R$^{2}$={r_value**2:.2f})'
-    plt.plot(x, slope * x + intercept, color='red', label=linear_fit_label)
+    linear_fit_label = f"Linear fit (Slope={slope:.2f}, R$^{2}$={r_value**2:.2f})"
+    plt.plot(x, slope * x + intercept, color="red", label=linear_fit_label)
 
     min_val = min(x.min(), y.min())
     max_val = max(x.max(), y.max())
-    plt.plot([min_val, max_val], [min_val, max_val], 
-            color='black', linestyle='--', label='1:1 Line')
+    plt.plot(
+        [min_val, max_val],
+        [min_val, max_val],
+        color="black",
+        linestyle="--",
+        label="1:1 Line",
+    )
 
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
     plt.legend()
     plt.grid(True)
-    
-    if print_plot==True:
+
+    if print_plot == True:
         plt.savefig(output_path)
     plt.show()
 
 
-def plot_linear_regression_with_color(data, x_col, y_col, color_col, output_path=None, print_plot=False):
-    
+def plot_linear_regression_with_color(
+    data, x_col, y_col, color_col, output_path=None, print_plot=False
+):
     """
     Generates a scatter plot with a linear regression line and a 1:1 line for data analysis.
 
@@ -328,28 +357,33 @@ def plot_linear_regression_with_color(data, x_col, y_col, color_col, output_path
     slope, intercept, r_value, _, _ = stats.linregress(x, y)
 
     # Plotting
-    scatter = plt.scatter(x, y, label='Data points', s=20,
-                          c=scatterdf[color_col],
-                          cmap='twilight')
+    scatter = plt.scatter(
+        x, y, label="Data points", s=20, c=scatterdf[color_col], cmap="twilight"
+    )
 
     # Plot the regression line
-    linear_fit_label = f'Linear fit (Slope={slope:.2f}, R$^{2}$={r_value**2:.2f})'
-    plt.plot(x, slope * x + intercept, color='red', label=linear_fit_label)
+    linear_fit_label = f"Linear fit (Slope={slope:.2f}, R$^{2}$={r_value**2:.2f})"
+    plt.plot(x, slope * x + intercept, color="red", label=linear_fit_label)
 
     # Plot the 1:1 line
     min_val = min(x.min(), y.min())
     max_val = max(x.max(), y.max())
-    plt.plot([min_val, max_val], [min_val, max_val],
-             color='black', linestyle='--', label='1:1 Line')
+    plt.plot(
+        [min_val, max_val],
+        [min_val, max_val],
+        color="black",
+        linestyle="--",
+        label="1:1 Line",
+    )
 
     # Add and label the colorbar
     cbar = plt.colorbar(scatter)
-    cbar.set_label(f'{color_col}')
+    cbar.set_label(f"{color_col}")
 
     # Add labels and other plot elements
-    plt.xlabel(f'{x_col}')
-    plt.ylabel(f'{y_col}')
-    plt.title(f'Scatter Plot of {y_col} vs. {x_col}')
+    plt.xlabel(f"{x_col}")
+    plt.ylabel(f"{y_col}")
+    plt.title(f"Scatter Plot of {y_col} vs. {x_col}")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
@@ -363,6 +397,7 @@ def plot_linear_regression_with_color(data, x_col, y_col, color_col, output_path
 import matplotlib.pyplot as plt
 from windrose import WindroseAxes
 
+
 def plot_wind_rose_from_df(df, wd_col, ws_col, title=None, save_path=None):
     """
     Generates and plots a wind rose from a pandas DataFrame.
@@ -375,16 +410,16 @@ def plot_wind_rose_from_df(df, wd_col, ws_col, title=None, save_path=None):
     ----------
     df : pandas.DataFrame
         The DataFrame containing the wind data.
-    
+
     wd_col : str
         The name of the column in `df` that contains the wind direction data (in degrees).
-    
+
     ws_col : str
         The name of the column in `df` that contains the wind speed data.
-    
+
     title : str, optional
         The title for the wind rose plot. If not provided, no title will be set.
-    
+
     save_path : str, optional
         The file path to save the plot. If not provided, the plot will not be saved.
         Example: 'my_wind_rose_plot.png'
@@ -396,39 +431,41 @@ def plot_wind_rose_from_df(df, wd_col, ws_col, title=None, save_path=None):
     """
     # Ensure the required columns exist in the DataFrame
     if wd_col not in df.columns or ws_col not in df.columns:
-        raise ValueError(f"DataFrame must contain both '{wd_col}' and '{ws_col}' columns.")
+        raise ValueError(
+            f"DataFrame must contain both '{wd_col}' and '{ws_col}' columns."
+        )
 
     # Drop any rows with missing data for the specified columns
     df_clean = df.dropna(subset=[wd_col, ws_col]).copy()
-    
+
     # Create the figure and WindroseAxes object
     fig = plt.figure(figsize=(8, 8), dpi=80)
     ax = WindroseAxes.from_ax(fig=fig)
-    
+
     # Plot the wind rose
-    ax.bar(df_clean[wd_col], df_clean[ws_col], normed=True, opening=0.8, edgecolor='white')
+    ax.bar(
+        df_clean[wd_col], df_clean[ws_col], normed=True, opening=0.8, edgecolor="white"
+    )
 
     # Set the legend and title
     ax.set_legend()
     if title:
         ax.set_title(title)
-    
+
     # Save the figure if a save path is provided
     if save_path:
         plt.savefig(save_path)
-    
+
     # Show the plot
     plt.show()
 
 
 def plot_interactive_regression_with_color(
-    
     df: pd.DataFrame,
     x_col: str,
     y_col: str,
     color_col: str,
-    plot_size: int = 500 # New parameter for plot size
-
+    plot_size: int = 500,  # New parameter for plot size
 ) -> None:
     """
     Generates an interactive scatter plot with a linear regression line, a 1:1 line,
@@ -452,8 +489,8 @@ def plot_interactive_regression_with_color(
     scatterdf = df[cols_to_use].dropna().copy()
 
     # Convert index to a column for hover data
-    index_name = df.index.name if df.index.name is not None else 'Index'
-    scatterdf = scatterdf.reset_index().rename(columns={'index': index_name})
+    index_name = df.index.name if df.index.name is not None else "Index"
+    scatterdf = scatterdf.reset_index().rename(columns={"index": index_name})
 
     x = scatterdf[x_col]
     y = scatterdf[y_col]
@@ -461,12 +498,14 @@ def plot_interactive_regression_with_color(
 
     # 2. Perform linear regression
     if len(x) < 2:
-        print("Not enough data points remaining after dropping NaNs to perform regression.")
+        print(
+            "Not enough data points remaining after dropping NaNs to perform regression."
+        )
         return
 
     slope, intercept, r_value, _, _ = stats.linregress(x, y)
     r_squared = r_value**2
-    
+
     # Calculate regression line points
     x_fit = np.linspace(x.min(), x.max(), 100)
     y_fit = slope * x_fit + intercept
@@ -480,80 +519,98 @@ def plot_interactive_regression_with_color(
     fig = go.Figure()
 
     # --- Trace 1: Scatter Points (Colored and Hoverable) ---
-    fig.add_trace(go.Scatter(
-        x=x,
-        y=y,
-        mode='markers',
-        marker=dict(
-            size=6, # Increased size slightly to make the outline clearer
-            color=color_data,  # This will determine the *outline* color,
-            opacity=0.6, # <-- Set transparency (0.0 is fully transparent, 1.0 is fully opaque)
-            colorscale='Twilight',
-            colorbar=dict(title=color_col),
-            showscale=True,
-            # ------------------------------------------------------------------
-            # ADD/CHANGE THESE LINES:
-            symbol='circle-open', # <-- Set the marker shape to an unfilled circle
-            line=dict(width=2, color=color_data) # <-- Set the outline color/width
-            # ------------------------------------------------------------------
-        ),
-        name='Data points',
-        # Define what shows up on hover
-        hovertext=scatterdf[index_name].astype(str),
-        hoverinfo='text+x+y',
-        customdata=scatterdf[[index_name, color_col]], # Use customdata for better label control
-        hovertemplate=(
-            f'<b>{index_name}: %{{hovertext}}</b><br>' +
-            f'{x_col}: %{{x:.2f}}<br>' +
-            f'{y_col}: %{{y:.2f}}<br>' +
-            f'{color_col}: %{{customdata[1]}}<extra></extra>' # use customdata for color
+    fig.add_trace(
+        go.Scatter(
+            x=x,
+            y=y,
+            mode="markers",
+            marker=dict(
+                size=6,  # Increased size slightly to make the outline clearer
+                color=color_data,  # This will determine the *outline* color,
+                opacity=0.6,  # <-- Set transparency (0.0 is fully transparent, 1.0 is fully opaque)
+                colorscale="Twilight",
+                colorbar=dict(title=color_col),
+                showscale=True,
+                # ------------------------------------------------------------------
+                # ADD/CHANGE THESE LINES:
+                symbol="circle-open",  # <-- Set the marker shape to an unfilled circle
+                line=dict(width=2, color=color_data),  # <-- Set the outline color/width
+                # ------------------------------------------------------------------
+            ),
+            name="Data points",
+            # Define what shows up on hover
+            hovertext=scatterdf[index_name].astype(str),
+            hoverinfo="text+x+y",
+            customdata=scatterdf[
+                [index_name, color_col]
+            ],  # Use customdata for better label control
+            hovertemplate=(
+                f"<b>{index_name}: %{{hovertext}}</b><br>"
+                + f"{x_col}: %{{x:.2f}}<br>"
+                + f"{y_col}: %{{y:.2f}}<br>"
+                + f"{color_col}: %{{customdata[1]}}<extra></extra>"  # use customdata for color
+            ),
         )
-    ))
+    )
 
     # --- Trace 2: Linear Regression Line ---
-    fig.add_trace(go.Scatter(
-        x=x_fit,
-        y=y_fit,
-        mode='lines',
-        line=dict(color='red', width=2),
-        name=f'Linear fit (Slope={slope:.2f}, R\u00B2={r_squared:.2f})',
-        hoverinfo='skip' # Don't show hover data for the line
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=x_fit,
+            y=y_fit,
+            mode="lines",
+            line=dict(color="red", width=2),
+            name=f"Linear fit (Slope={slope:.2f}, R\u00b2={r_squared:.2f})",
+            hoverinfo="skip",  # Don't show hover data for the line
+        )
+    )
 
     # --- Trace 3: 1:1 Line ---
-    fig.add_trace(go.Scatter(
-        x=[min_val, max_val],
-        y=[min_val, max_val],
-        mode='lines',
-        line=dict(color='black', dash='dash'),
-        name='1:1 Line',
-        hoverinfo='skip'
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=[min_val, max_val],
+            y=[min_val, max_val],
+            mode="lines",
+            line=dict(color="black", dash="dash"),
+            name="1:1 Line",
+            hoverinfo="skip",
+        )
+    )
 
     # 4. Configure Layout
     fig.update_layout(
-        title=f'Scatter Plot of {y_col} vs. {x_col}',
+        title=f"Scatter Plot of {y_col} vs. {x_col}",
         xaxis_title=x_col,
         yaxis_title=y_col,
-        hovermode='closest',
-        plot_bgcolor='white',
+        hovermode="closest",
+        plot_bgcolor="white",
         width=plot_size,
         height=plot_size,
         # --------------------------------------------------------
-        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
     )
 
     # Ensure axis ranges match for the 1:1 line to be square
-    fig.update_xaxes(showgrid=True, gridcolor='lightgray')
-    fig.update_yaxes(showgrid=True, gridcolor='lightgray')
+    fig.update_xaxes(showgrid=True, gridcolor="lightgray")
+    fig.update_yaxes(showgrid=True, gridcolor="lightgray")
 
     fig.show()
 
 
-def plotlystuff(datasets, colnames, chrttypes=None, datatitles=None, chrttitle='', colors=None,
-                two_yaxes=False, axisdesig=None, axislabels=['Levels', 'Barometric Pressure'], opac=None, 
-                plot_height=300):
-    '''Plots one or more datasets on a shared set of axes
+def plotlystuff(
+    datasets,
+    colnames,
+    chrttypes=None,
+    datatitles=None,
+    chrttitle="",
+    colors=None,
+    two_yaxes=False,
+    axisdesig=None,
+    axislabels=["Levels", "Barometric Pressure"],
+    opac=None,
+    plot_height=300,
+):
+    """Plots one or more datasets on a shared set of axes
 
     datasets: list of one or more datasets to plot, must have datetime index
     colnames: list of one or more column names to plot on the y-axis; must be one column name per dataset
@@ -564,88 +621,100 @@ def plotlystuff(datasets, colnames, chrttypes=None, datatitles=None, chrttitle='
     axislabels: list of names to for legend to label y-value on each dataset
     opac:list of values for opacity setting of datasets; default is 0.8
     plot_height: integer value for height of plot; default is 300
-    '''
-    
+    """
+
     if chrttypes is None:
-        chrttypes = ['lines'] * len(datasets)
+        chrttypes = ["lines"] * len(datasets)
 
     if opac is None:
         opac = [0.8] * len(datasets)
-        
+
     if datatitles is None:
         datatitles = colnames
-    
+
     if axisdesig is None:
-        axisdesig = ['y1'] * len(datasets)
-        
+        axisdesig = ["y1"] * len(datasets)
+
     if colors is None:
-        if len(datasets) <= 5: 
-            colors = ['#228B22', '#FF1493', '#5acafa', '#663399', '#FF0000']
+        if len(datasets) <= 5:
+            colors = ["#228B22", "#FF1493", "#5acafa", "#663399", "#FF0000"]
         else:
             colors = []
             for i in range(len(datasets)):
-                colors.append('#{:02x}{:02x}{:02x}'.format(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)))
-    
-    modetypes = ['markers', 'lines+markers', 'lines']
+                colors.append(
+                    "#{:02x}{:02x}{:02x}".format(
+                        random.randint(0, 255),
+                        random.randint(0, 255),
+                        random.randint(0, 255),
+                    )
+                )
+
+    modetypes = ["markers", "lines+markers", "lines"]
     datum = {}
-    
+
     # Plotting the line charts for the datasets
     for i in range(len(datasets)):
-        datum['d' + str(i)] = go.Scatter(
+        datum["d" + str(i)] = go.Scatter(
             x=datasets[i].index,
             y=datasets[i][colnames[i]],
             name=datatitles[i],
             line=dict(color=colors[i]),
             mode=chrttypes[i],
             opacity=opac[i],
-            yaxis=axisdesig[i]
+            yaxis=axisdesig[i],
         )
-    
+
     # Combine the data for plotting
     data = list(datum.values())
 
     # Calculate dynamic y-axis range
     y_min = min([datasets[i][colnames[i]].min() for i in range(len(datasets))])
     y_max = max([datasets[i][colnames[i]].max() for i in range(len(datasets))])
-    
+
     # Layout definition with adjustments for vertical space and axis range
     layout = dict(
         title=chrttitle,
         xaxis=dict(
-            rangeslider=dict(visible=True),
-            type='date',
-            tickformat='%Y-%m-%d %H:%M'
+            rangeslider=dict(visible=True), type="date", tickformat="%Y-%m-%d %H:%M"
         ),
         yaxis=dict(
-            title=axislabels[0],
-            titlefont=dict(color='#1f77b4'),
-            tickfont=dict(color='#1f77b4'),
-            range=[y_min, y_max]  # Set dynamic y-axis range
+            title=dict(
+                text=axislabels[0],
+                font=dict(color="#1f77b4"),
+            ),
+            tickfont=dict(color="#1f77b4"),
+            range=[y_min, y_max],  # Set dynamic y-axis range
         ),
         height=plot_height,  # Increase the height for more vertical space
-        margin=dict(t=50, b=50, l=60, r=60)  # Adjust margins
+        margin=dict(t=50, b=50, l=60, r=60),  # Adjust margins
     )
-    
+
     if two_yaxes:
-        layout['yaxis2'] = dict(
-            title=axislabels[1],
-            titlefont=dict(color='#ff7f0e'),
-            tickfont=dict(color='#ff7f0e'),
-            anchor='x',
-            overlaying='y',
-            side='right',
-            position=0.15
+        layout["yaxis2"] = dict(
+            title=dict(text=axislabels[1], font=dict(color="#ff7f0e")),
+            tickfont=dict(color="#ff7f0e"),
+            anchor="x",
+            overlaying="y",
+            side="right",
+            position=0.15,
         )
 
     fig = dict(data=data, layout=layout)
-    iplot(fig, filename='well')
+    iplot(fig, filename="well")
     return
 
 
-def compare_to_sig_strength(df, var, signal_var='H2O_SIG_STRGTH_MIN', cutoff=0.8, scaling_factor=1, sig_plot=False):
+def compare_to_sig_strength(
+    df,
+    var,
+    signal_var="H2O_SIG_STRGTH_MIN",
+    cutoff=0.8,
+    scaling_factor=1,
+    sig_plot=False,
+):
     '''
-    Create plotlystuff plots to view all data for a variable over time and 
-    values for that variable when the signal strength is below the indicated 
+    Create plotlystuff plots to view all data for a variable over time and
+    values for that variable when the signal strength is below the indicated
     cutoff value.
 
     Args:
@@ -654,34 +723,38 @@ def compare_to_sig_strength(df, var, signal_var='H2O_SIG_STRGTH_MIN', cutoff=0.8
     signal_var (str): Name of variable representing signal strength to plot
         Should be either H2O_SIG_STRGTH_MIN or CO2_SIG_STRGTH_MIN
     cutoff (float): Cutoff value to investigate for signal strength
-    scaling_factor (int): value to scale the signal_var by so that signal 
+    scaling_factor (int): value to scale the signal_var by so that signal
         strength and variable of interest can be co-plot
-    sig_plot (bolean): If True, will plot second plot showing variable alongside 
+    sig_plot (bolean): If True, will plot second plot showing variable alongside
         scaled signal strength
     """
 
 
     '''
     temp = df.copy()
-    sig_name = f'{signal_var}_SCALED'
-    temp[sig_name] = temp[signal_var]*scaling_factor
-    mask = temp[signal_var]<cutoff
-    var_name = f'{var}_BELOW_CUTOFF'
+    sig_name = f"{signal_var}_SCALED"
+    temp[sig_name] = temp[signal_var] * scaling_factor
+    mask = temp[signal_var] < cutoff
+    var_name = f"{var}_BELOW_CUTOFF"
     temp[var_name] = temp[var]
     temp.loc[~mask, var_name] = np.nan
     if sig_plot:
-        plotlystuff([temp, temp, temp], [var, var_name, sig_name], chrttitle=f'{var} with {cutoff} cutoff')
-    plotlystuff([temp, temp], [var, var_name], chrttitle=f'{var} with {cutoff} cutoff')
-    return(temp)
+        plotlystuff(
+            [temp, temp, temp],
+            [var, var_name, sig_name],
+            chrttitle=f"{var} with {cutoff} cutoff",
+        )
+    plotlystuff([temp, temp], [var, var_name], chrttitle=f"{var} with {cutoff} cutoff")
+    return temp
 
 
 def plot_flux_vs_ustar(
-    df: pd.DataFrame, 
-    mode: str = 'night',
-    ustar_col: str = 'USTAR', 
-    le_col: str = 'LE_1_1_1', 
-    h_col: str = 'H_1_1_1', 
-    netrad_col: str = 'NETRAD_1_1_2'
+    df: pd.DataFrame,
+    mode: str = "night",
+    ustar_col: str = "USTAR",
+    le_col: str = "LE_1_1_1",
+    h_col: str = "H_1_1_1",
+    netrad_col: str = "NETRAD_1_1_2",
 ) -> None:
     r"""
     Plot Latent Heat (LE), Sensible Heat (H), and their sum vs Friction Velocity (u*).
@@ -707,71 +780,106 @@ def plot_flux_vs_ustar(
     Notes
     -----
     **Why this is impfortant:**
-    1. **u* Threshold Detection:** Under low turbulence (typically night), 
-       measured fluxes often underestimate the true exchange. By plotting 
-       Flux vs. $u_*$, we look for the "plateau"—the $u_*$ value where the 
-       flux becomes independent of wind speed. This is your $u_*$ filter 
+    1. **u* Threshold Detection:** Under low turbulence (typically night),
+       measured fluxes often underestimate the true exchange. By plotting
+       Flux vs. $u_*$, we look for the "plateau"—the $u_*$ value where the
+       flux becomes independent of wind speed. This is your $u_*$ filter
        cutoff.
-    
-    2. **The Oasis Effect:** In irrigated fields or wetlands surrounded by 
-       dry areas, LE can exceed Net Radiation ($R_n$). This plot helps identify 
-       if negative Sensible Heat ($H < 0$) is "feeding" evaporation, a classic 
+
+    2. **The Oasis Effect:** In irrigated fields or wetlands surrounded by
+       dry areas, LE can exceed Net Radiation ($R_n$). This plot helps identify
+       if negative Sensible Heat ($H < 0$) is "feeding" evaporation, a classic
        indicator of regional advection.
-    
-    3. **Energy Balance Verification:** Monitoring the sum $(H + LE)$ relative 
-       to $u_*$ helps determine if the "missing energy" in your balance is 
+
+    3. **Energy Balance Verification:** Monitoring the sum $(H + LE)$ relative
+       to $u_*$ helps determine if the "missing energy" in your balance is
        correlated with poor mixing or specific wind conditions.
     """
     # 1. Filter data
-    if mode.lower() == 'day':
+    if mode.lower() == "day":
         subset = df[df[netrad_col] > 10].copy()
         title_str = "Daytime ($R_n > 10$)"
     else:
         subset = df[df[netrad_col] <= 10].copy()
         title_str = "Nighttime ($R_n \leq 10$)"
-        
+
     if subset.empty:
         print("No data found for this mode.")
         return
 
     # Calculate Turbulent Sum
-    subset['Sum_H_LE'] = subset[le_col] + subset[h_col]
+    subset["Sum_H_LE"] = subset[le_col] + subset[h_col]
 
     # 2. Binning
     u_max = subset[ustar_col].quantile(0.99)
     bins = np.arange(0, u_max + 0.05, 0.05)
-    subset['bin'] = pd.cut(subset[ustar_col], bins=bins)
-    
-    stats = subset.groupby('bin', observed=True).agg({
-        ustar_col: 'mean',
-        le_col: ['mean', 'std'],
-        h_col: ['mean', 'std'],
-        'Sum_H_LE': ['mean', 'std']
-    }).dropna()
-    stats.columns = ['ustar_mean', 'le_mean', 'le_std', 'h_mean', 'h_std', 'sum_mean', 'sum_std']
+    subset["bin"] = pd.cut(subset[ustar_col], bins=bins)
+
+    stats = (
+        subset.groupby("bin", observed=True)
+        .agg(
+            {
+                ustar_col: "mean",
+                le_col: ["mean", "std"],
+                h_col: ["mean", "std"],
+                "Sum_H_LE": ["mean", "std"],
+            }
+        )
+        .dropna()
+    )
+    stats.columns = [
+        "ustar_mean",
+        "le_mean",
+        "le_std",
+        "h_mean",
+        "h_std",
+        "sum_mean",
+        "sum_std",
+    ]
 
     # 3. Plotting
     plt.figure(figsize=(10, 7))
-    
+
     # Raw Data (faded scatter)
-    plt.scatter(subset[ustar_col], subset[le_col], color='blue', alpha=0.03, s=2)
-    plt.scatter(subset[ustar_col], subset[h_col], color='red', alpha=0.03, s=2)
-    plt.scatter(subset[ustar_col], subset['Sum_H_LE'], color='green', alpha=0.03, s=2)
-    
+    plt.scatter(subset[ustar_col], subset[le_col], color="blue", alpha=0.03, s=2)
+    plt.scatter(subset[ustar_col], subset[h_col], color="red", alpha=0.03, s=2)
+    plt.scatter(subset[ustar_col], subset["Sum_H_LE"], color="green", alpha=0.03, s=2)
+
     # Binned Averages with Error Bars
-    plt.errorbar(stats['ustar_mean'], stats['le_mean'], yerr=stats['le_std'], 
-                 fmt='o-', color='darkblue', capsize=3, label=r'$LE \pm \sigma$')
-    plt.errorbar(stats['ustar_mean'], stats['h_mean'], yerr=stats['h_std'], 
-                 fmt='s-', color='darkred', capsize=3, label=r'$H \pm \sigma$')
-    plt.errorbar(stats['ustar_mean'], stats['sum_mean'], yerr=stats['sum_std'], 
-                 fmt='d-', color='green', capsize=3, label=r'$(H+LE) \pm \sigma$')
-    
-    plt.axhline(0, color='black', linewidth=1)
+    plt.errorbar(
+        stats["ustar_mean"],
+        stats["le_mean"],
+        yerr=stats["le_std"],
+        fmt="o-",
+        color="darkblue",
+        capsize=3,
+        label=r"$LE \pm \sigma$",
+    )
+    plt.errorbar(
+        stats["ustar_mean"],
+        stats["h_mean"],
+        yerr=stats["h_std"],
+        fmt="s-",
+        color="darkred",
+        capsize=3,
+        label=r"$H \pm \sigma$",
+    )
+    plt.errorbar(
+        stats["ustar_mean"],
+        stats["sum_mean"],
+        yerr=stats["sum_std"],
+        fmt="d-",
+        color="green",
+        capsize=3,
+        label=r"$(H+LE) \pm \sigma$",
+    )
+
+    plt.axhline(0, color="black", linewidth=1)
     plt.title(f"Energy Components vs. $u_*$: {title_str}", fontsize=14)
-    plt.xlabel(r'$u_*$ (m s$^{-1}$)', fontsize=12)
-    plt.ylabel(r'Flux (W m$^{-2}$)', fontsize=12)
-    plt.grid(True, linestyle=':', alpha=0.6)
-    plt.legend(loc='best', fontsize=9)
-    
+    plt.xlabel(r"$u_*$ (m s$^{-1}$)", fontsize=12)
+    plt.ylabel(r"Flux (W m$^{-2}$)", fontsize=12)
+    plt.grid(True, linestyle=":", alpha=0.6)
+    plt.legend(loc="best", fontsize=9)
+
     plt.tight_layout()
     plt.show()
