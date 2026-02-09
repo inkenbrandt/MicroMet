@@ -801,7 +801,7 @@ def plot_flux_vs_ustar(
         title_str = "Daytime ($R_n > 10$)"
     else:
         subset = df[df[netrad_col] <= 10].copy()
-        title_str = "Nighttime ($R_n \leq 10$)"
+        title_str = r"Nighttime ($R_n \leq 10$)"
 
     if subset.empty:
         print("No data found for this mode.")

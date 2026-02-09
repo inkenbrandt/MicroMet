@@ -97,7 +97,7 @@ def sample_netrad_df():
     # This is a simplified model for test purposes
     hours = dt_index.hour + dt_index.minute / 60
     sw_in = 1000 * np.sin(np.pi * hours / 24)**2 * (np.sin(np.pi * (dt_index.dayofyear - 80) / 365))
-    sw_in = sw_in.to_numpy() # Convert to numpy array to make it mutable
+    sw_in = sw_in.to_numpy().copy() # Convert to numpy array to make it mutable
     sw_in[sw_in < 0] = 0
 
     # Introduce a 1-hour lag

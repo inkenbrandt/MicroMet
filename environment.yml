@@ -12,3 +12,7 @@ dependencies:
   - sqlalchemy
   - requests
   - pytz
+  - statsmodels
+  - scikit-learn
+  - windrose
+  - tzdata
