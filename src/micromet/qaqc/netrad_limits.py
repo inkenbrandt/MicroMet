@@ -302,7 +302,10 @@ def _infer_freq_minutes(dt: pd.DatetimeIndex) -> int:
         If the index contains fewer than two timestamps or if the
         inferred interval is not positive.
     """
-    diffs = np.diff(dt.view("i8"))  # nanoseconds
+    # Ensure we are working with nanoseconds for consistent calculation
+    # pandas 3.0+ may use microseconds by default
+    dt_ns = pd.to_datetime(dt).values.astype("datetime64[ns]").view("i8")
+    diffs = np.diff(dt_ns)
     if len(diffs) == 0:
         raise ValueError("Need at least two timestamps to infer frequency.")
     med = np.median(diffs)

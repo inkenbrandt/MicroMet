@@ -124,9 +124,10 @@ class Reformatter:
                     "check_timestamps=True"
                 )
 
-    def prepare(self, df, interval, data_type="eddy"):
+    def prepare(self, df, interval=30, data_type="eddy"):
         """Current method - keep for backward compatibility"""
-        return self.process(df, interval=interval, data_type=data_type)
+        df, report, _ = self.process(df, interval=interval, data_type=data_type)
+        return df, report
 
     def preprocess(self, df, data_type="eddy", interval=30):
         """

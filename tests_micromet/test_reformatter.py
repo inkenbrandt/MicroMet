@@ -51,6 +51,7 @@ def station_data_factory(tmp_path):
 def sample_reformatter_df():
     data = {
         'TIMESTAMP_START': ['202401010000', '202401010030', '202401010100'],
+        'TIMESTAMP_END': ['202401010030', '202401010100', '202401010130'],
         'Ta': [25.5, 26.0, 24.9],
         'Tau': [0.1, 0.0, 0.2],
         'u_star': [0.5, 0.6, 0.7],

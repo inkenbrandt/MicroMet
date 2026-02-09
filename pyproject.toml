@@ -24,6 +24,10 @@ dependencies = [
     "pyyaml>=5.4",
     "requests>=2.25",
     "pytz>=2021.1",
+    "statsmodels",
+    "scikit-learn",
+    "windrose",
+    "tzdata",
 ]
 
 [project.optional-dependencies]
@@ -35,7 +39,6 @@ docs = [
     "myst-parser>=0.15",
 ]
 test = [
-    "python>=3.11",
     "pytest>=6.0",
     "pytest-cov>=2.0",
 ]
