@@ -201,7 +201,7 @@ def compare_gap_summaries(
     gaps_a = _prep(gaps_a)
     gaps_b = _prep(gaps_b)
 
-    freq_td = to_offset(expected_freq).delta
+    freq_td = pd.Timedelta(to_offset(expected_freq))
     hours_per_step = freq_td / pd.Timedelta(hours=1)
 
     # Build a quick lookup: for each (station, column), list of (start, end) gaps
