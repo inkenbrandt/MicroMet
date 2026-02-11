@@ -14,4 +14,4 @@ pytz
 statsmodels
 scikit-learn
 windrose
-tzdata
+python-tzdata
