@@ -42,7 +42,7 @@ from .format.transformers import (
     MISSING_VALUE,
 )
 
-__version__ = "0.4.3"
+__version__ = "0.4.4"
 
 __all__ = [
     "AmerifluxDataProcessor",
