@@ -27,7 +27,7 @@ dependencies = [
     "statsmodels",
     "scikit-learn",
     "windrose",
-    "tzdata",
+    "python-tzdata",
 ]
 
 [project.optional-dependencies]
