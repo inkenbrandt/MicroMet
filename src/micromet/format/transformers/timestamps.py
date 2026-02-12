@@ -146,10 +146,26 @@ def timestamp_reset(df: pd.DataFrame, minutes: int = 30) -> pd.DataFrame:
     )
     return df
 
+def add_ameriflux_timestamps(df, interval_minutes=30):
+    """
+    Creates TIMESTAMP_START and TIMESTAMP_END columns from a DatetimeIndex
+    in the YYYYMMDDHHmm format required by AmeriFlux.
+    """
+    # 1. Derive the start and end datetime objects
+    # Assuming your current index is the END of the interval
+    dt_end = df.index
+    dt_start = df.index - pd.Timedelta(minutes=interval_minutes)
+    
+    # 2. Convert to the specific string format: 202407301500
+    df['TIMESTAMP_START'] = dt_start.strftime('%Y%m%d%H%M').astype(object)
+    df['TIMESTAMP_END'] = dt_end.strftime('%Y%m%d%H%M').astype(object)
+    return(df)
+
 
 __all__ = [
     "infer_datetime_col",
     "fix_timestamps",
     "resample_timestamps",
     "timestamp_reset",
+    'add_ameriflux_timestamps'
 ]
