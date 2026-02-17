@@ -32,6 +32,7 @@ from .format import transformers
 from .format import merge
 from .format import file_compile
 from .qaqc import data_cleaning
+from .report import easyflux_footprint
 from .format.transformers import (
     columns,
     timestamps,
@@ -63,4 +64,5 @@ __all__ = [
     "corrections",
     "cleanup",
     "MISSING_VALUE",
+    "easyflux_footprint",
 ]
