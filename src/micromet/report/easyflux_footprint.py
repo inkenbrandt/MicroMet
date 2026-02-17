@@ -25,7 +25,7 @@ from typing import Optional, Tuple, Dict
 # ---------------------------------------------------------------------------
 # Physical & numerical constants
 # ---------------------------------------------------------------------------
-K_VON_KARMAN = 0.4          # von Kármán constant
+K_VON_KARMAN = 0.4  # von Kármán constant
 PI = np.pi
 NMBR_INT_INTERV_SEGMENT = 100  # Default integration sub-intervals per segment
 
@@ -55,15 +55,18 @@ class SiteConfig:
     n_int : int
         Number of integration sub-intervals per segment (default 100).
     """
+
     z: float = 1.64
     z0: float = 0.01
     sonic_azimuth: float = 0.0
-    dist_intrst: Dict[str, float] = field(default_factory=lambda: {
-        '60_300': 500.0,
-        '60_170': 500.0,
-        '170_190': 500.0,
-        '190_300': 500.0,
-    })
+    dist_intrst: Dict[str, float] = field(
+        default_factory=lambda: {
+            "60_300": 500.0,
+            "60_170": 500.0,
+            "170_190": 500.0,
+            "190_300": 500.0,
+        }
+    )
     n_int: int = NMBR_INT_INTERV_SEGMENT
 
     def set_uniform_dist(self, d: float):
@@ -78,17 +81,21 @@ class SiteConfig:
 @dataclass
 class FootprintResult:
     """Container for a single-period footprint calculation."""
+
     fetch_max: float = np.nan
     fetch_90: float = np.nan
     fetch_55: float = np.nan
     fetch_40: float = np.nan
-    fp_dist_intrst: float = np.nan   # cumulative footprint [%] at upwind dist of interest
-    fp_equation: str = ''
+    fp_dist_intrst: float = (
+        np.nan
+    )  # cumulative footprint [%] at upwind dist of interest
+    fp_equation: str = ""
 
 
 # ---------------------------------------------------------------------------
 #  Kljun et al. (2004) footprint model
 # ---------------------------------------------------------------------------
+
 
 def _pbl_height_kljun(obukhov: float) -> float:
     """Estimate planetary boundary-layer height from Obukhov length.
@@ -120,16 +127,23 @@ def _pbl_height_kljun(obukhov: float) -> float:
             return 200.0 - (84.0 - obukhov) * (50.0 / 46.0)
 
 
-def _kljun_footprint_value(x: float, k1_suz_zh: float, suz: float,
-                           k2: float, k3: float, k4: float) -> float:
+def _kljun_footprint_value(
+    x: float, k1_suz_zh: float, suz: float, k2: float, k3: float, k4: float
+) -> float:
     """Evaluate the Kljun footprint density at distance x."""
     t = (suz * x + k4) / k3
-    return k1_suz_zh * (t ** k2) * np.exp(k2 * (1.0 - t))
+    return k1_suz_zh * (t**k2) * np.exp(k2 * (1.0 - t))
 
 
-def footprint_kljun(u_star: float, sigma_w: float, z: float,
-                    obukhov: float, z0: float, upwnd_dist: float,
-                    n_int: int = NMBR_INT_INTERV_SEGMENT) -> FootprintResult:
+def footprint_kljun(
+    u_star: float,
+    sigma_w: float,
+    z: float,
+    obukhov: float,
+    z0: float,
+    upwnd_dist: float,
+    n_int: int = NMBR_INT_INTERV_SEGMENT,
+) -> FootprintResult:
     """Kljun et al. (2004) footprint model.
 
     Parameters
@@ -146,7 +160,7 @@ def footprint_kljun(u_star: float, sigma_w: float, z: float,
     -------
     FootprintResult with fetch_max, fetch_90/55/40, fp_dist_intrst.
     """
-    res = FootprintResult(fp_equation='Kljun et al')
+    res = FootprintResult(fp_equation="Kljun et al")
 
     if np.isnan(u_star) or np.isnan(sigma_w) or np.isnan(obukhov):
         return res
@@ -181,37 +195,79 @@ def footprint_kljun(u_star: float, sigma_w: float, z: float,
     fp_40 = 0.0
 
     # Helper for trapezoidal accumulation + threshold detection
-    def _accum_trap(x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev,
-                    fp_win, fp_90, fp_55, fp_40):
+    def _accum_trap(
+        x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev, fp_win, fp_90, fp_55, fp_40
+    ):
         fp_cum += intv * (fp_L + fp_R) / 2.0
         if x_L < upwnd_dist <= x_R:
-            fp_win = 100.0 * (fp_cum_prev + (fp_cum - fp_cum_prev) *
-                              (upwnd_dist - x_L) / intv)
+            fp_win = 100.0 * (
+                fp_cum_prev + (fp_cum - fp_cum_prev) * (upwnd_dist - x_L) / intv
+            )
         if fp_cum >= 0.4 and fp_40 == 0.0:
-            fp_40 = x_R - intv * (fp_cum - 0.4) / (fp_cum - fp_cum_prev) if fp_cum != fp_cum_prev else x_R
+            fp_40 = (
+                x_R - intv * (fp_cum - 0.4) / (fp_cum - fp_cum_prev)
+                if fp_cum != fp_cum_prev
+                else x_R
+            )
         if fp_cum >= 0.55 and fp_55 == 0.0:
-            fp_55 = x_R - intv * (fp_cum - 0.55) / (fp_cum - fp_cum_prev) if fp_cum != fp_cum_prev else x_R
+            fp_55 = (
+                x_R - intv * (fp_cum - 0.55) / (fp_cum - fp_cum_prev)
+                if fp_cum != fp_cum_prev
+                else x_R
+            )
         if fp_cum >= 0.9 and fp_90 == 0.0:
-            fp_90 = x_R - intv * (fp_cum - 0.9) / (fp_cum - fp_cum_prev) if fp_cum != fp_cum_prev else x_R
+            fp_90 = (
+                x_R - intv * (fp_cum - 0.9) / (fp_cum - fp_cum_prev)
+                if fp_cum != fp_cum_prev
+                else x_R
+            )
         return fp_cum, fp_win, fp_90, fp_55, fp_40
 
     # Helper for Boole's rule accumulation
-    def _accum_boole(x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev,
-                     fp_win, fp_90, fp_55, fp_40, eval_fn):
+    def _accum_boole(
+        x_L,
+        x_R,
+        fp_L,
+        fp_R,
+        intv,
+        fp_cum,
+        fp_cum_prev,
+        fp_win,
+        fp_90,
+        fp_55,
+        fp_40,
+        eval_fn,
+    ):
         fp_m1 = eval_fn(x_L + 0.25 * intv)
         fp_m2 = eval_fn(x_L + 0.50 * intv)
         fp_m3 = eval_fn(x_L + 0.75 * intv)
-        fp_cum += intv * (7.0 * fp_L + 32.0 * fp_m1 + 12.0 * fp_m2 +
-                          32.0 * fp_m3 + 7.0 * fp_R) / 90.0
+        fp_cum += (
+            intv
+            * (7.0 * fp_L + 32.0 * fp_m1 + 12.0 * fp_m2 + 32.0 * fp_m3 + 7.0 * fp_R)
+            / 90.0
+        )
         if x_L < upwnd_dist <= x_R:
-            fp_win = 100.0 * (fp_cum_prev + (fp_cum - fp_cum_prev) *
-                              (upwnd_dist - x_L) / intv)
+            fp_win = 100.0 * (
+                fp_cum_prev + (fp_cum - fp_cum_prev) * (upwnd_dist - x_L) / intv
+            )
         if fp_cum >= 0.4 and fp_40 == 0.0:
-            fp_40 = x_R - intv * (fp_cum - 0.4) / (fp_cum - fp_cum_prev) if fp_cum != fp_cum_prev else x_R
+            fp_40 = (
+                x_R - intv * (fp_cum - 0.4) / (fp_cum - fp_cum_prev)
+                if fp_cum != fp_cum_prev
+                else x_R
+            )
         if fp_cum >= 0.55 and fp_55 == 0.0:
-            fp_55 = x_R - intv * (fp_cum - 0.55) / (fp_cum - fp_cum_prev) if fp_cum != fp_cum_prev else x_R
+            fp_55 = (
+                x_R - intv * (fp_cum - 0.55) / (fp_cum - fp_cum_prev)
+                if fp_cum != fp_cum_prev
+                else x_R
+            )
         if fp_cum >= 0.9 and fp_90 == 0.0:
-            fp_90 = x_R - intv * (fp_cum - 0.9) / (fp_cum - fp_cum_prev) if fp_cum != fp_cum_prev else x_R
+            fp_90 = (
+                x_R - intv * (fp_cum - 0.9) / (fp_cum - fp_cum_prev)
+                if fp_cum != fp_cum_prev
+                else x_R
+            )
         return fp_cum, fp_win, fp_90, fp_55, fp_40
 
     eval_kljun = lambda x: _kljun_footprint_value(x, k1_suz_zh, suz, k2, k3, k4)
@@ -228,8 +284,8 @@ def footprint_kljun(u_star: float, sigma_w: float, z: float,
         fp_L = fp_R
         fp_R = eval_kljun(x_R)
         fp_cum, fp_win, fp_90, fp_55, fp_40 = _accum_trap(
-            x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev,
-            fp_win, fp_90, fp_55, fp_40)
+            x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev, fp_win, fp_90, fp_55, fp_40
+        )
 
     # --- Segment 2: left inflection → x_max ---
     intv = (x_max - x_infl_L) / n_int
@@ -240,8 +296,8 @@ def footprint_kljun(u_star: float, sigma_w: float, z: float,
         fp_L = fp_R
         fp_R = eval_kljun(x_R)
         fp_cum, fp_win, fp_90, fp_55, fp_40 = _accum_trap(
-            x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev,
-            fp_win, fp_90, fp_55, fp_40)
+            x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev, fp_win, fp_90, fp_55, fp_40
+        )
 
     # --- Segment 3: x_max → past right inflection (2× segment width) ---
     intv = (x_infl_R - x_max) / n_int
@@ -253,8 +309,8 @@ def footprint_kljun(u_star: float, sigma_w: float, z: float,
         fp_L = fp_R
         fp_R = eval_kljun(x_R)
         fp_cum, fp_win, fp_90, fp_55, fp_40 = _accum_trap(
-            x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev,
-            fp_win, fp_90, fp_55, fp_40)
+            x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev, fp_win, fp_90, fp_55, fp_40
+        )
         if fp_90 > 0:
             found_90 = True
             break
@@ -268,8 +324,19 @@ def footprint_kljun(u_star: float, sigma_w: float, z: float,
         fp_L = fp_R
         fp_R = eval_kljun(x_R)
         fp_cum, fp_win, fp_90, fp_55, fp_40 = _accum_boole(
-            x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev,
-            fp_win, fp_90, fp_55, fp_40, eval_kljun)
+            x_L,
+            x_R,
+            fp_L,
+            fp_R,
+            intv,
+            fp_cum,
+            fp_cum_prev,
+            fp_win,
+            fp_90,
+            fp_55,
+            fp_40,
+            eval_kljun,
+        )
 
     # Check 90% after segment 4
     if fp_cum >= 0.9 and fp_90 == 0.0:
@@ -290,10 +357,23 @@ def footprint_kljun(u_star: float, sigma_w: float, z: float,
                 fp_L = fp_R
                 fp_R = eval_kljun(x_R)
                 fp_cum, fp_win, fp_90, fp_55, fp_40 = _accum_boole(
-                    x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev,
-                    fp_win, fp_90, fp_55, fp_40, eval_kljun)
+                    x_L,
+                    x_R,
+                    fp_L,
+                    fp_R,
+                    intv,
+                    fp_cum,
+                    fp_cum_prev,
+                    fp_win,
+                    fp_90,
+                    fp_55,
+                    fp_40,
+                    eval_kljun,
+                )
                 if fp_cum >= 0.9 and np.isnan(fp_90):
-                    fp_90 = x_R - intv * (fp_cum - 0.9) / max(fp_cum - fp_cum_prev, 1e-30)
+                    fp_90 = x_R - intv * (fp_cum - 0.9) / max(
+                        fp_cum - fp_cum_prev, 1e-30
+                    )
 
             if fp_win == 0.0:
                 fp_win = min(100.0 * fp_cum, 99.0) if fp_cum < 1.0 else 99.0
@@ -312,19 +392,23 @@ def footprint_kljun(u_star: float, sigma_w: float, z: float,
 #  Kormann & Meixner (2001) footprint model
 # ---------------------------------------------------------------------------
 
+
 def _gamma_nemes(mu: float) -> float:
     """Gamma function of mu using Nemes (2007) approximation.
 
     Identical to the CRBASIC implementation.
     """
-    return np.sqrt(2.0 * PI / mu) * (
-        ((mu + 1.0 / (12.0 * mu - 0.1 / mu)) / np.e) ** mu
-    )
+    return np.sqrt(2.0 * PI / mu) * (((mu + 1.0 / (12.0 * mu - 0.1 / mu)) / np.e) ** mu)
 
 
-def footprint_kormann_meixner(u_star: float, z: float, stability: float,
-                               u_total: float, upwnd_dist: float,
-                               n_int: int = NMBR_INT_INTERV_SEGMENT) -> FootprintResult:
+def footprint_kormann_meixner(
+    u_star: float,
+    z: float,
+    stability: float,
+    u_total: float,
+    upwnd_dist: float,
+    n_int: int = NMBR_INT_INTERV_SEGMENT,
+) -> FootprintResult:
     """Kormann & Meixner (2001) footprint model.
 
     Parameters
@@ -340,7 +424,7 @@ def footprint_kormann_meixner(u_star: float, z: float, stability: float,
     -------
     FootprintResult with fetch_max, fetch_90/55/40, fp_dist_intrst.
     """
-    res = FootprintResult(fp_equation='KormannMeixner')
+    res = FootprintResult(fp_equation="KormannMeixner")
     k = K_VON_KARMAN
 
     if np.isnan(u_star) or np.isnan(stability) or np.isnan(u_total):
@@ -359,15 +443,15 @@ def footprint_kormann_meixner(u_star: float, z: float, stability: float,
         phi_c = 1.0 / np.sqrt(1.0 - 16.0 * stab_clamped)
 
     # Composite variables
-    wnd_const = u_total / (z ** m_km)
+    wnd_const = u_total / (z**m_km)
     r_km = 2.0 + m_km - n_km
     kp = (k * u_star * z ** (1.0 - n_km)) / phi_c
     xi = wnd_const / (kp * r_km * r_km)
     mu = (m_km + 1.0) / r_km
 
     gamma_mu = _gamma_nemes(mu)
-    xgz = ((xi ** mu) * (z ** (m_km + 1.0))) / gamma_mu
-    xz = xi * (z ** r_km)
+    xgz = ((xi**mu) * (z ** (m_km + 1.0))) / gamma_mu
+    xz = xi * (z**r_km)
 
     # Peak and inflection points
     x_max = xz / (mu + 1.0)
@@ -389,12 +473,14 @@ def footprint_kormann_meixner(u_star: float, z: float, stability: float,
     fp_55 = 0.0
     fp_40 = 0.0
 
-    def _accum_trap(x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev,
-                    fp_win, fp_90, fp_55, fp_40):
+    def _accum_trap(
+        x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev, fp_win, fp_90, fp_55, fp_40
+    ):
         fp_cum += intv * (fp_L + fp_R) / 2.0
         if x_L < upwnd_dist <= x_R:
-            fp_win = 100.0 * (fp_cum_prev + (fp_cum - fp_cum_prev) *
-                              (upwnd_dist - x_L) / intv)
+            fp_win = 100.0 * (
+                fp_cum_prev + (fp_cum - fp_cum_prev) * (upwnd_dist - x_L) / intv
+            )
         if fp_cum >= 0.4 and fp_40 == 0.0:
             fp_40 = x_R - intv * (fp_cum - 0.4) / max(fp_cum - fp_cum_prev, 1e-30)
         if fp_cum >= 0.55 and fp_55 == 0.0:
@@ -403,16 +489,21 @@ def footprint_kormann_meixner(u_star: float, z: float, stability: float,
             fp_90 = x_R - intv * (fp_cum - 0.9) / max(fp_cum - fp_cum_prev, 1e-30)
         return fp_cum, fp_win, fp_90, fp_55, fp_40
 
-    def _accum_boole(x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev,
-                     fp_win, fp_90, fp_55, fp_40):
+    def _accum_boole(
+        x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev, fp_win, fp_90, fp_55, fp_40
+    ):
         fp_m1 = eval_km(x_L + 0.25 * intv)
         fp_m2 = eval_km(x_L + 0.50 * intv)
         fp_m3 = eval_km(x_L + 0.75 * intv)
-        fp_cum += intv * (7.0 * fp_L + 32.0 * fp_m1 + 12.0 * fp_m2 +
-                          32.0 * fp_m3 + 7.0 * fp_R) / 90.0
+        fp_cum += (
+            intv
+            * (7.0 * fp_L + 32.0 * fp_m1 + 12.0 * fp_m2 + 32.0 * fp_m3 + 7.0 * fp_R)
+            / 90.0
+        )
         if x_L < upwnd_dist <= x_R:
-            fp_win = 100.0 * (fp_cum_prev + (fp_cum - fp_cum_prev) *
-                              (upwnd_dist - x_L) / intv)
+            fp_win = 100.0 * (
+                fp_cum_prev + (fp_cum - fp_cum_prev) * (upwnd_dist - x_L) / intv
+            )
         if fp_cum >= 0.4 and fp_40 == 0.0:
             fp_40 = x_R - intv * (fp_cum - 0.4) / max(fp_cum - fp_cum_prev, 1e-30)
         if fp_cum >= 0.55 and fp_55 == 0.0:
@@ -433,8 +524,8 @@ def footprint_kormann_meixner(u_star: float, z: float, stability: float,
         fp_L = fp_R
         fp_R = eval_km(x_R)
         fp_cum, fp_win, fp_90, fp_55, fp_40 = _accum_trap(
-            x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev,
-            fp_win, fp_90, fp_55, fp_40)
+            x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev, fp_win, fp_90, fp_55, fp_40
+        )
 
     # --- Segment 2: left inflection → x_max ---
     intv = (x_max - x_infl_L) / n_int
@@ -445,8 +536,8 @@ def footprint_kormann_meixner(u_star: float, z: float, stability: float,
         fp_L = fp_R
         fp_R = eval_km(x_R)
         fp_cum, fp_win, fp_90, fp_55, fp_40 = _accum_trap(
-            x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev,
-            fp_win, fp_90, fp_55, fp_40)
+            x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev, fp_win, fp_90, fp_55, fp_40
+        )
 
     # --- Segment 3: x_max → past right inflection (2× segment) ---
     intv = (x_infl_R - x_max) / n_int
@@ -458,8 +549,8 @@ def footprint_kormann_meixner(u_star: float, z: float, stability: float,
         fp_L = fp_R
         fp_R = eval_km(x_R)
         fp_cum, fp_win, fp_90, fp_55, fp_40 = _accum_trap(
-            x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev,
-            fp_win, fp_90, fp_55, fp_40)
+            x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev, fp_win, fp_90, fp_55, fp_40
+        )
         if fp_90 > 0:
             found_90 = True
             break
@@ -473,8 +564,8 @@ def footprint_kormann_meixner(u_star: float, z: float, stability: float,
         fp_L = fp_R
         fp_R = eval_km(x_R)
         fp_cum, fp_win, fp_90, fp_55, fp_40 = _accum_boole(
-            x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev,
-            fp_win, fp_90, fp_55, fp_40)
+            x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev, fp_win, fp_90, fp_55, fp_40
+        )
 
     if fp_cum >= 0.9 and fp_90 == 0.0:
         fp_90 = x_R - intv * (fp_cum - 0.9) / max(fp_cum - fp_cum_prev, 1e-30)
@@ -489,8 +580,18 @@ def footprint_kormann_meixner(u_star: float, z: float, stability: float,
             fp_L = fp_R
             fp_R = eval_km(x_R)
             fp_cum, fp_win, fp_90, fp_55, fp_40 = _accum_boole(
-                x_L, x_R, fp_L, fp_R, intv, fp_cum, fp_cum_prev,
-                fp_win, fp_90, fp_55, fp_40)
+                x_L,
+                x_R,
+                fp_L,
+                fp_R,
+                intv,
+                fp_cum,
+                fp_cum_prev,
+                fp_win,
+                fp_90,
+                fp_55,
+                fp_40,
+            )
             if fp_cum >= 0.9 and fp_90 == 0.0:
                 fp_90 = x_R - intv * (fp_cum - 0.9) / max(fp_cum - fp_cum_prev, 1e-30)
             if x_R > upwnd_dist and fp_90 > x_max:
@@ -514,21 +615,22 @@ def footprint_kormann_meixner(u_star: float, z: float, stability: float,
 #  Wind-direction sector helper
 # ---------------------------------------------------------------------------
 
+
 def _get_upwind_dist(wd_sonic: float, dist_intrst: Dict[str, float]) -> float:
     """Select the upwind distance of interest based on WD_SONIC sector.
 
     Follows the EasyFlux-DL convention exactly.
     """
     if wd_sonic <= 60.0:
-        return dist_intrst['60_300']
+        return dist_intrst["60_300"]
     elif wd_sonic <= 170.0:
-        return dist_intrst['60_170']
+        return dist_intrst["60_170"]
     elif wd_sonic < 190.0:
-        return dist_intrst['170_190']
+        return dist_intrst["170_190"]
     elif wd_sonic < 300.0:
-        return dist_intrst['190_300']
+        return dist_intrst["190_300"]
     else:
-        return dist_intrst['60_300']
+        return dist_intrst["60_300"]
 
 
 def wd_compass_to_sonic(wd_compass: float, sonic_azimuth: float) -> float:
@@ -543,9 +645,16 @@ def wd_compass_to_sonic(wd_compass: float, sonic_azimuth: float) -> float:
 #  Main dispatcher: calculate footprint for a single period
 # ---------------------------------------------------------------------------
 
-def calc_footprint(ustar: float, w_sigma: float, zl: float,
-                   mo_length: float, ws_rslt: float, wd_compass: float,
-                   cfg: SiteConfig) -> FootprintResult:
+
+def calc_footprint(
+    ustar: float,
+    w_sigma: float,
+    zl: float,
+    mo_length: float,
+    ws_rslt: float,
+    wd_compass: float,
+    cfg: SiteConfig,
+) -> FootprintResult:
     """Calculate footprint characteristics for one averaging period.
 
     This replicates the footprint selection logic from the EasyFlux-DL
@@ -577,20 +686,22 @@ def calc_footprint(ustar: float, w_sigma: float, zl: float,
     # Footprint model selection (Kljun criteria from EasyFlux-DL)
     if (zl >= -200.0) and (zl <= 1.0) and (ustar >= 0.2) and (z >= 1.0):
         # Kljun et al. (2004)
-        return footprint_kljun(ustar, w_sigma, z, mo_length, cfg.z0,
-                               upwnd_dist, cfg.n_int)
+        return footprint_kljun(
+            ustar, w_sigma, z, mo_length, cfg.z0, upwnd_dist, cfg.n_int
+        )
     else:
         # Kormann & Meixner (2001)
-        return footprint_kormann_meixner(ustar, z, zl, ws_rslt,
-                                         upwnd_dist, cfg.n_int)
+        return footprint_kormann_meixner(ustar, z, zl, ws_rslt, upwnd_dist, cfg.n_int)
 
 
 # ---------------------------------------------------------------------------
 #  Batch processing: apply to a DataFrame
 # ---------------------------------------------------------------------------
 
-def recalculate_fetch(df: pd.DataFrame, cfg: SiteConfig,
-                      col_map: Optional[Dict[str, str]] = None) -> pd.DataFrame:
+
+def recalculate_fetch(
+    df: pd.DataFrame, cfg: SiteConfig, col_map: Optional[Dict[str, str]] = None
+) -> pd.DataFrame:
     """Recalculate FETCH values for an entire DataFrame.
 
     Parameters
@@ -611,12 +722,12 @@ def recalculate_fetch(df: pd.DataFrame, cfg: SiteConfig,
         FP_DIST_INTRST_new, FP_EQUATION_new
     """
     default_map = {
-        'ustar':     'USTAR_1_1_1',
-        'w_sigma':   'W_SIGMA_1_1_1',
-        'zl':        'ZL_1_1_1',
-        'mo_length': 'MO_LENGTH_1_1_1',
-        'ws_rslt':   'WS_1_1_1',
-        'wd':        'WD_1_1_1',
+        "ustar": "USTAR_1_1_1",
+        "w_sigma": "W_SIGMA_1_1_1",
+        "zl": "ZL_1_1_1",
+        "mo_length": "MO_LENGTH_1_1_1",
+        "ws_rslt": "WS_1_1_1",
+        "wd": "WD_1_1_1",
     }
     cm = {**default_map, **(col_map or {})}
 
@@ -625,21 +736,21 @@ def recalculate_fetch(df: pd.DataFrame, cfg: SiteConfig,
 
     for idx, row in df.iterrows():
         r = calc_footprint(
-            ustar=row[cm['ustar']],
-            w_sigma=row[cm['w_sigma']],
-            zl=row[cm['zl']],
-            mo_length=row[cm['mo_length']],
-            ws_rslt=row[cm['ws_rslt']],
-            wd_compass=row[cm['wd']],
+            ustar=row[cm["ustar"]],
+            w_sigma=row[cm["w_sigma"]],
+            zl=row[cm["zl"]],
+            mo_length=row[cm["mo_length"]],
+            ws_rslt=row[cm["ws_rslt"]],
+            wd_compass=row[cm["wd"]],
             cfg=cfg,
         )
         results.append(r)
 
-    out['FETCH_MAX_new'] = [r.fetch_max for r in results]
-    out['FETCH_90_new'] = [r.fetch_90 for r in results]
-    out['FETCH_55_new'] = [r.fetch_55 for r in results]
-    out['FETCH_40_new'] = [r.fetch_40 for r in results]
-    out['FP_DIST_INTRST_new'] = [r.fp_dist_intrst for r in results]
-    out['FP_EQUATION_new'] = [r.fp_equation for r in results]
+    out["FETCH_MAX_new"] = [r.fetch_max for r in results]
+    out["FETCH_90_new"] = [r.fetch_90 for r in results]
+    out["FETCH_55_new"] = [r.fetch_55 for r in results]
+    out["FETCH_40_new"] = [r.fetch_40 for r in results]
+    out["FP_DIST_INTRST_new"] = [r.fp_dist_intrst for r in results]
+    out["FP_EQUATION_new"] = [r.fp_equation for r in results]
 
     return out
