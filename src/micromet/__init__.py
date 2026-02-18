@@ -32,7 +32,11 @@ from .format import transformers
 from .format import merge
 from .format import file_compile
 from .qaqc import data_cleaning
-from .report import easyflux_footprint
+from .report import easyflux_footprint, alfalfa_growth
+from .report.alfalfa_growth import (
+    simulate_alfalfa_height_multi_field,
+    AlfalfaHeightParams,
+)
 from .format.transformers import (
     columns,
     timestamps,
@@ -43,7 +47,7 @@ from .format.transformers import (
     MISSING_VALUE,
 )
 
-__version__ = "0.4.4"
+__version__ = "0.4.5"
 
 __all__ = [
     "AmerifluxDataProcessor",
@@ -65,4 +69,5 @@ __all__ = [
     "cleanup",
     "MISSING_VALUE",
     "easyflux_footprint",
+    "alfalfa_growth",
 ]
