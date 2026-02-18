@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-def update_albedo(df, suffix):
+def update_albedo(df, suffix, threshold=0.1):
     """
     Calculates the Shortwave Albedo percentage based on incoming and outgoing radiation.
 
@@ -13,6 +13,8 @@ def update_albedo(df, suffix):
         df (pd.DataFrame): The dataset containing radiation measurements.
         suffix (str): The sensor or level identifier used in column naming 
                       (e.g., '1' for 'SW_IN_1').
+        threshold (float): Minimum incoming radiation (W/m²) to consider valid for albedo 
+                    calculation. Commonly 0.1 for NR01 and 10 for SN500
 
     Returns:
         np.ndarray: Calculated Albedo values as a percentage (0-100%). 
@@ -22,7 +24,7 @@ def update_albedo(df, suffix):
     sw_out_col = f'SW_OUT_{suffix}'
 
     # Logic: SWin must be above threshold and greater than reflected radiation
-    daylight_mask = (df[sw_in_col] > 0.1) & (df[sw_in_col] >= df[sw_out_col])
+    daylight_mask = (df[sw_in_col] > threshold) & (df[sw_in_col] >= df[sw_out_col])
     
     # Check for missing data in either component
     missing_mask = df[sw_in_col].isna() | df[sw_out_col].isna()
