@@ -32,7 +32,7 @@ from .format import transformers
 from .format import merge
 from .format import file_compile
 from .qaqc import data_cleaning
-from .report import easyflux_footprint, alfalfa_growth, alfalfa_height
+from .report import easyflux_footprint, alfalfa_growth
 from .report.alfalfa_growth import (
     simulate_alfalfa_height_multi_field,
     AlfalfaHeightParams,
