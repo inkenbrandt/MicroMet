@@ -32,19 +32,24 @@ def apply_fixes(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
     pd.DataFrame
         The DataFrame with all fixes applied.
     """
-    df = tau_fixer(df)
+    df = tau_fixer(df, threshold=0.5, logger=logger)
     df = fix_swc_percent(df, logger)
     df = ssitc_scale(df, logger)
     return df
 
 
-def tau_fixer(df: pd.DataFrame) -> pd.DataFrame:
+def tau_fixer(df: pd.DataFrame, threshold: float = 0.5, logger: logging.Logger = None) -> pd.DataFrame:
     """
-    Replace zero values in the 'TAU' column with NaN.
+    Replace zero values in the 'TAU' column with NaN and flips sign if needed.
 
-    This function checks for zero values in the 'TAU' column and replaces
-    them with NaN. This is often done to handle cases where zero represents
+    Loops through all columns with TAU in the name that don't also have SSITC or QC in the name.
+
+    This function checks for zero values or negative infinity values in the 'TAU' column 
+    and replaces them with NaN. This is often done to handle cases where zero represents
     a missing or invalid measurement.
+
+    The function also determines whether to reverse the sign of TAU. If more than the specified 
+    threshold of TAU values are positive, it flips the sign of all TAU values. 
 
     Parameters
     ----------
@@ -56,10 +61,27 @@ def tau_fixer(df: pd.DataFrame) -> pd.DataFrame:
     pd.DataFrame
         The DataFrame with zero values in 'TAU' replaced by NaN.
     """
-    if "TAU" in df.columns and "U_STAR" in df.columns:
-        bad_idx = df["TAU"] == 0
-        df.loc[bad_idx, "TAU"] = np.nan
-    return df
+    df2 = df.copy()
+    tau_mask = df2.columns.str.contains('TAU')
+    ssitc_mask = df2.columns.str.contains('SSITC')
+    qc_mask = df2.columns.str.contains('QC')
+    tau_col = df2.columns[tau_mask & ~ssitc_mask & ~qc_mask]
+    logger.debug(f"TAU columns identified for fixing: {tau_col.tolist()}")
+    for col in tau_col:
+        bad_idx = (df2[col] == 0) | (df2[col] == -np.inf)
+        df2.loc[bad_idx, col] = np.nan
+
+        positive_mask = (df2[col] > 0)
+        negative_mask = (df2[col] < 0)
+
+        percent_positive = positive_mask.sum()/(positive_mask.sum() + 
+                                                negative_mask.sum())
+        if percent_positive > threshold:
+            df2[col] *= -1
+            logger.debug(f"{col} values were flipped for station due to {percent_positive:.2%} of values being positive.")
+        else:
+            logger.debug(f"{col} values were not flipped for station due to only {percent_positive:.2%} of values being positive.")
+    return df2
 
 
 def fix_swc_percent(df: pd.DataFrame, logger: logging.Logger) -> pd.DataFrame:
