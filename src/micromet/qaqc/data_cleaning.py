@@ -9,6 +9,20 @@ def prep_parquet(station, df):
     df = df.sort_index()
     return(df)
 
+def adjust_wind_direction(series, degrees):
+    """
+    Adjusts wind direction in degrees and ensures the result stays within [0, 360).
+    
+    Parameters:
+    series (pd.Series): The wind direction column.
+    degrees (float): Degrees to add (positive) or subtract (negative).
+    
+    Returns:
+    pd.Series: The adjusted values ready for assignment.
+    """
+    # Using modulo 360 handles both positive and negative wraparounds
+    return (series + degrees) % 360
+
 def set_range_to_nan(
     df: pd.DataFrame,
     column_name: str,
