@@ -63,7 +63,7 @@ def apply_physical_limits(
     out = df if inplace else df.copy()
     no_limits = ['CO2_DENSITY_SIGMA_1_1_1', 'FC_SAMPLES_1_1_1', 
                  'H_SAMPLES_1_1_1','LE_SAMPLES_1_1_1', 'RECORD',
-                 'TAU_QC_1_1_1']
+                 'TAU_QC_1_1_1', 'FC_QC_1_1_1','LE_QC_1_1_1' ]
     col_list = [i for i in out.columns if i not in no_limits]
 
     keys = list(limits_dict.keys())
