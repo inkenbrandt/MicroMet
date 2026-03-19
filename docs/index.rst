@@ -11,6 +11,7 @@ Welcome to Micromet's documentation!
    data_processing
    flux_workflow_summary
    flux_processing_workflow
+   notebooks
    modules
    about_ufn
    ameriflux_variables

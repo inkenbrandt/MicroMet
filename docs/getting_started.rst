@@ -9,16 +9,19 @@ Installation
 ------------
 
 Micromet is available on PyPI and can be installed using pip:
+
 .. code-block:: bash
 
     pip install micromet
 
 Alternatively, if you want to use the latest development version, you can install it directly from GitHub:
+
 .. code-block:: bash
 
     pip install git+https://github.com/inkenbrandt/MicroMet.git
 
 MicroMet is also available as a conda package. You can install it using the following command:
+
 .. code-block:: bash
 
     conda install -c conda-forge micromet
@@ -38,17 +41,11 @@ It's recommended to use a virtual environment:
     python -m venv .venv
     source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-Install dependencies:
+Install the package with optional documentation and development dependencies:
 
 .. code-block:: bash
 
-    pip install -r requirements.txt
-
-To install in editable/development mode:
-
-.. code-block:: bash
-
-    pip install -e .
+    pip install -e .[docs,test]
 
 Usage Overview
 --------------
@@ -57,7 +54,7 @@ Micromet consists of modular tools for reformatting and analyzing micrometeorolo
 
 .. code-block:: python
 
-    from micromet.converter import Reformatter
+    from micromet.format.reformatter import Reformatter
 
     # Load your raw data into a pandas DataFrame
     import pandas as pd
@@ -65,24 +62,49 @@ Micromet consists of modular tools for reformatting and analyzing micrometeorolo
 
     # Create a Reformatter instance and process the data
     ref = Reformatter()
-    tidy_df = ref.prepare(df)
+    cleaned_df, report = ref.prepare(df, data_type='eddy')
 
-    # Now tidy_df contains the cleaned and normalized data
-    print(tidy_df.head())
+    # Now cleaned_df contains the cleaned and normalized data
+    print(cleaned_df.head())
 
 Modules
 -------
 
-The key modules in Micromet are:
+The key subpackages and modules in Micromet are:
 
-- ``converter`` — Reformat raw CSV files into tidy dataframes
-- ``tools`` — Utility functions for timestamp alignment and filtering
-- ``headers`` — Functions for renaming columns and interpreting header metadata
-- ``station_data_pull`` — (Optional) Pull and organize station-specific data files
+- ``format`` — Data formatting subpackage:
+
+  - ``reformatter`` — Main :class:`~micromet.format.reformatter.Reformatter` class for cleaning and standardizing data
+  - ``file_compile`` — Utilities for compiling multiple raw ``.dat`` files into a single dataset
+  - ``merge`` — Functions for merging eddy covariance and met data streams
+  - ``compare`` — Instrument comparison and cross-correlation functions
+  - ``headers`` — Utilities for detecting and applying missing headers across files
+  - ``transformers`` — Data transformation submodule (``columns``, ``timestamps``, ``corrections``, ``validation``, ``cleanup``, ``interval_updates``)
+
+- ``qaqc`` — Quality assurance and control subpackage:
+
+  - ``variable_limits`` — Physical and plausible range definitions for all variables
+  - ``netrad_limits`` — Net radiation QA/QC and timestamp alignment
+  - ``data_cleaning`` — QC flag application and data cleaning
+
+- ``report`` — Reporting and visualization subpackage:
+
+  - ``graphs`` — Plotting functions (energy Sankey diagrams, instrument comparison scatter plots)
+  - ``tools`` — Utility functions for analysis (irrigation event detection, gap finding)
+  - ``validate`` — Data validation, lag detection, and sensor intercomparison
+  - ``fix_g_values`` — Soil heat flux storage corrections
+  - ``recalculate_albedo`` — Albedo recalculation utilities
+  - ``gap_summary`` — Gap analysis and reporting
+  - ``eddy_plots`` — Eddy covariance diagnostic plots
+  - ``easyflux_footprint`` — Flux footprint analysis
+  - ``alfalfa_growth`` — Alfalfa height modeling from growing degree days
+
+- ``reader`` — :class:`~micromet.reader.AmerifluxDataProcessor` for reading AmeriFlux and TOA5 data files
+- ``station_data_pull`` — :class:`~micromet.station_data_pull.StationDataDownloader` and :class:`~micromet.station_data_pull.StationDataProcessor` for managing station data
 
 .. note::
 
-   The ``Notebooks`` directory is intended for exploratory analysis and is not part of the core API documentation.
+   The ``notebooks/`` directory contains worked examples and is not part of the core API. See :doc:`notebooks` for a guide to the available notebooks.
 
 Contributing
 ------------
@@ -98,7 +120,8 @@ Please make sure to add unit tests for new functionality and follow PEP8 standar
 Further Reading
 ---------------
 
-- :doc:`api`
-- :doc:`usage_examples`
+- :doc:`modules`
+- :doc:`data_processing`
+- :doc:`flux_workflow_summary`
 - `Micromet on GitHub <https://github.com/inkenbrandt/MicroMet>`_
-
+- `Full documentation on Read the Docs <https://micromet.readthedocs.io/en/latest/>`_
