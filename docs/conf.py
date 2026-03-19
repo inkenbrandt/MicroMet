@@ -10,7 +10,7 @@ import micromet
 project = "micromet"
 copyright = "2026, Paul Inkenbrandt, Kathryn Ladig, Diane Menuz"
 author = "Paul Inkenbrandt, Kathryn Ladig, Diane Menuz"
-release = "0.4.5"
+release = "0.5.0"
 
 master_doc = "index"  # The name of the master document (without the .rst extension)
 # -- General configuration ---------------------------------------------------
@@ -23,12 +23,15 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx_autodoc_typehints",
     "myst_parser",
+    "nbsphinx",
 ]
 
 source_suffix = {
     ".rst": "restructuredtext",
     ".md": "markdown",
 }
+
+nbsphinx_execute = "never"  # Do not re-execute notebooks during build
 
 templates_path = ["_templates"]
 exclude_patterns = [

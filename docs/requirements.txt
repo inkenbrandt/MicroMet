@@ -1,7 +1,10 @@
 sphinx
 sphinx-autodoc-typehints
 sphinx-rtd-theme
+sphinx-copybutton
 myst-parser
+nbsphinx
+ipykernel
 pandas
 numpy
 plotly
