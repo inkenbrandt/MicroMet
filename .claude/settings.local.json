@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l docs/notebooks/*.ipynb)",
+      "Bash(python3:*)"
+    ]
+  }
+}
