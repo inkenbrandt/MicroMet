@@ -619,3 +619,42 @@ if __name__ == "__main__":
     # Create and show plot
     fig = plot_gaps(gaps_df, "Sample Data Gaps")
     fig.show()
+
+
+def subset_year(df, year, subset_type='growing_season', gs_start='04-01', gs_end='10-31'):
+    """
+    Subsets a DataFrame based on a seasonal window for a specific year.
+
+    This function filters data based on a DatetimeIndex. It can extract either 
+    the "growing season" within a single year or the "winter" period that 
+    spans from the end of the specified year to the start of the next.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame. Must have a DatetimeIndex.
+        year (int): The year to perform the subsetting for.
+        subset_type (str, optional): The type of subset to return. 
+            Options are 'growing_season' or 'winter'. Defaults to 'growing_season'.
+        gs_start (str, optional): The start date of the growing season in 'MM-DD' 
+            format. Defaults to '04-01'.
+        gs_end (str, optional): The end date of the growing season in 'MM-DD' 
+            format. Defaults to '10-31'.
+
+    Returns:
+        pd.DataFrame: A subsetted DataFrame if data is found; otherwise, returns None.
+
+    Raises:
+        AttributeError: If the DataFrame index is not a DatetimeIndex.
+    """
+    if subset_type == 'growing_season':
+        mask = (df.index >= f'{year}-{gs_start} 0:00') & (df.index <= f'{year}-{gs_end} 23:30')
+        output = df[mask]
+        
+    if subset_type == 'winter':
+        mask = (df.index > f'{year}-{gs_end} 23:30') & (df.index < f'{year+1}-{gs_start} 0:00')
+        output = df[mask]
+        
+    if output.empty:
+        print(f"No data in {subset_type} for year {year}")
+    else:
+        print(f'Data subset from {output.index.min()} to {output.index.max()}')
+        return output
