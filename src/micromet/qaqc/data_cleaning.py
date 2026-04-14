@@ -502,3 +502,44 @@ def impute_missing_values(
 
     # 6. Return the resulting Series, renamed
     return imputed_series
+
+
+
+def adjust_wd(df, wd_col, public_azimuth, actual_azimuth, start_date, end_date):
+    """
+    Adjusts wind direction values in a DataFrame based on sensor orientation differences.
+
+    This function calculates the offset between a 'public' (reported) azimuth and the 
+    'actual' sensor azimuth, then applies this correction to a specific time range 
+    within the dataset, ensuring the results stay within the [0, 360) degree range.
+
+    Args:
+        df (pd.DataFrame): The input dataframe, expected to have a DatetimeIndex.
+        wd_col (str): The name of the column containing wind direction values.
+        public_azimuth (float): The baseline or incorrectly assumed orientation angle.
+        actual_azimuth (float): The true physical orientation angle of the sensor.
+        start_date (str or pd.Timestamp): The beginning of the period to adjust (inclusive).
+        end_date (str or pd.Timestamp): The end of the period to adjust (exclusive).
+
+    Returns:
+        pd.DataFrame: A copy of the original DataFrame with corrected wind direction values.
+    """
+    # Create a deep copy to avoid SettingWithCopyWarning or mutating the original object
+    df_copy = df.copy()
+    
+    # Standardize date formats to ensure compatibility with the index
+    start_dt = pd.to_datetime(start_date)
+    end_dt = pd.to_datetime(end_date)
+    
+    # Create a boolean mask for the specified date range
+    date_mask = (df_copy.index >= start_dt) & (df_copy.index < end_dt)
+    
+    # Calculate the angular difference (the 'correction factor')
+    # Positive difference indicates a clockwise shift
+    wind_diff = actual_azimuth - public_azimuth  
+    
+    # Apply the correction only to the masked rows
+    # Use modulo 360 to keep degrees within a standard circle (0-359.9)
+    df_copy.loc[date_mask, wd_col] = (df_copy.loc[date_mask, wd_col] + wind_diff) % 360
+    
+    return df_copy
