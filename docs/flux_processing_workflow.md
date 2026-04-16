@@ -14,9 +14,9 @@ The pipeline progresses linearly through five major stages with review notebooks
 
 | Step | Notebook | Purpose | Output |
 |------|----------|---------|--------|
-| 1 | `1_compile_and_preprocess` | Merge preprocessed data sources into a single raw dataset | `*_raw.parquet` |
-| 2 | `2_create_raw_data` | Alternate/extended raw dataset assembly with alignment corrections | `*_raw.parquet` |
-| 3 | `3_qc_data` | Apply calibrations, physical limits, flags, and manual QC | `*_qc.parquet` |
+| 1 | `1_compile_and_preprocess` | Create compiled and clean versions of data from each data stream (e.g., CSFlux web/datalogger, AmeriFlux eddy web/datalogger, MetStats, MetAF)  | `*_preprocessed.parquet` |
+| 2 | `2_create_raw_data` | Assemble multiple preprocessed files into final datasets and manage any datetime shifts | `*_raw.parquet` |
+| 3 | `3_qc_data` | Apply calibrations, physical limits, and manual QC | `*_qc.parquet` |
 | *3a* | `3a_variable_review` | *Summary statistics and distribution analysis of QC data* | *Diagnostic output* |
 | *3b* | `3b_plot_review` | *Interactive time-series plots of every variable* | *Visual review only* |
 | 4 | `4_ameriflux` | Signal-strength filter, drop non-AmeriFlux columns, format and export | `*_HH_*.csv` |
@@ -62,9 +62,32 @@ M:/Shared drives/UGS_Flux/
 
 **Notebook:** `1_compile_and_preprocess.ipynb`
 
-Assembles a single raw dataset from multiple preprocessed data sources for one station.
+Create compiled and clean versions of data from each data stream (e.g., CSFlux web/datalogger, AmeriFlux eddy web/datalogger, MetStats, MetAF) 
 
 ### Key Operations
+
+1. **Organize datalogger files** into a single directory by table name (e.g., Statistics_Ameriflux, Statistics, Flux_AmerifluxFormat, Flux_CSFormat)
+2. **Compile data** from a single data stream into a dataframe
+3. **Clean data** by applying renaming dictionary, setting data types, and fixing timestamp issue
+4. **Subset out data** to only include 30 or 60 minute data, depending on user input
+5. **Present data for review** to identify misnamed columns and missing data
+6. **Export data** into separate parquet files for data from each data stream
+
+### Configuration
+
+- `station` -- AmeriFlux station ID
+- `interval` -- measurement interval in minutes (30 or 60)
+- Paths to datalogger files and files from EasyFlux Web
+
+### Output
+
+`{station}_{interval}_{datatype}_preprocessed.parquet` in `preprocessed_site_data/`
+
+---
+
+## Step 2 -- Create Raw Dataset
+
+**Notebook:** `2_create_raw_data.ipynb`
 
 1. **Load preprocessed parquets** for each data stream (CSFlux web/datalogger, AmeriFlux eddy web/datalogger, MetStats, MetAF)
 2. **Compare and merge eddy data** -- CSFlux and AmeriFlux eddy streams are compared for differences; the AmeriFlux stream is primary, with CSFlux filling gaps and providing unique columns (e.g., `G_PLATE`, diagnostic fields)
@@ -73,26 +96,6 @@ Assembles a single raw dataset from multiple preprocessed data sources for one s
 5. **Combine eddy and met** -- merge the two streams, resolve duplicate columns, validate 30-minute interval integrity
 6. **Standardize column naming** -- apply AmeriFlux positional suffixes (`_1_1_1`, `_1_1_2`, etc.)
 7. **Trim to station record** -- drop data before the station install date (retrieved from the database API)
-
-### Configuration
-
-- `station` -- AmeriFlux station ID
-- `interval` -- measurement interval in minutes (30 or 60)
-- Paths to preprocessed parquets and output directory
-
-### Output
-
-`{station}_{timestart}_{timeend}_raw.parquet` in `final_database_tables/raw/`
-
----
-
-## Step 2 -- Create Raw Dataset
-
-**Notebook:** `2_create_raw_data.ipynb`
-
-An alternate or extended version of Step 1 that performs the same core task -- merging preprocessed streams into a raw dataset -- with the same general approach: compare web vs. datalogger sources, merge eddy and met data, detect SoilVue time shifts, correct historical timestamp issues, standardize columns, and export.
-
-This notebook can serve as the primary raw-data assembly step depending on the station. The key operations and output format are the same as Step 1.
 
 ---
 
@@ -108,8 +111,8 @@ The largest and most site-specific step. Applies corrections, physical limits, a
 2. **Apply calibration corrections** -- site-specific fixes applied before the program update date to avoid double-correction:
    - Soil heat flux storage (SG) thickness correction
    - Precipitation tipping bucket calibration factor
-   - G_PLATE sign inversions
-   - G values recalculated as `G = SG + G_PLATE`
+   - NR01 calibration factors
+3. **Rename G Variables** to calculate surface G and create G_1 for Ameriflux 
 3. **Calculate SoilVue-derived ground heat flux** -- use the `soil_heat` library (Johansen thermal properties model) to compute `G_SURFACE_3_1_1` from SoilVue temperature and moisture profiles
 4. **Apply physical limits** via `Reformatter.finalize()`:
    - Converts SWC from fraction to percent
@@ -119,15 +122,13 @@ The largest and most site-specific step. Applies corrections, physical limits, a
 5. **Manual corrections** -- address site-specific data issues:
    - Spurious precipitation on station visit days
    - G_PLATE zeros (sensor disconnection)
-   - SoilVue spikes (flagged by thermal conductivity threshold)
-   - NETRAD and G_PLATE spikes
-   - Wind direction offsets between instruments
-   - Temperature, pressure, and other sensor-specific spikes
-   - Precipitation nulling before sensor repair dates
+   - Despike data
+   - Sensor failure
+   - Address any wind direction offsets
 6. **Signal-strength flagging**:
    - `H2O_SIG_FLAG` and `CO2_SIG_FLAG`: 0 = good (signal >= 0.8), 1 = marginal (< 0.8), 2 = known bad period
    - `WD_1_1_1_FLAG`: flags wind from behind the tower or obstruction sectors
-7. **Gap-fill ground heat flux** -- train linear regression models between redundant G sources to impute missing values
+7. **Gap-fill ground heat flux** -- Calculate G_1 as average between heat flux plates and gap-fill with linear regression
 
 ### Output
 
@@ -140,7 +141,7 @@ The largest and most site-specific step. Applies corrections, physical limits, a
 
 **Notebook:** `3a_variable_review.ipynb`
 
-Read-only review of the QC dataset. Generates summary statistics and distribution analysis for each variable to evaluate data quality. Includes counts, percentiles, data availability, and outlier detection. Any issues found should be corrected by adding blocks to Notebook 3.
+Read-only review of the QC dataset. Generates time series plots and scatter plots between redundant sensors for visual evaluation of data quality. Focuses primarily on net radiation and components, wind speed and direction, soil heat flux and component variables, temperature, and relative humidity. Also looks at closure and the relationship between closure and signal strength. Any issues found should be corrected by adding blocks to Notebook 3.
 
 ---
 
@@ -188,7 +189,7 @@ Runs the `fluxdataqaqc` package to perform energy balance ratio (EBR) correction
 
 ### Key Operations
 
-1. **Gap-fill redundant sensors** -- use linear regression to cross-fill between redundant NETRAD and G sources (e.g., `NETRAD_1_1_1` / `NETRAD_1_1_2`), creating `*_FINAL` columns
+1. **Gap-fill redundant sensors** -- use linear regression to cross-fill between redundant NETRAD sources (e.g., `NETRAD_1_1_1` / `NETRAD_1_1_2`), creating `*_FINAL` columns
 2. **Run FluxDataQAQC** with `.ini` configuration files mapping columns to Rn, G, LE, H, etc.:
    - `daily_frac = 1` (require complete days)
    - `max_interp_hours = 2` (daytime) / `max_interp_hours_night = 4` (nighttime)
@@ -208,9 +209,12 @@ Runs the `fluxdataqaqc` package to perform energy balance ratio (EBR) correction
 ## Data Flow Diagram
 
 ```
-Preprocessed Parquets (CSFlux + AmeriFlux Eddy + MetStats + MetAF)
+Raw data logger and Easyflux Web files
     |
-    v  [Notebook 1/2: Compile & Merge]
+    v  [Notebook 1: Compile and Preprocess CSFlux + AmeriFlux Eddy + MetStats + MetAF]
+*_preprocessed.parquet
+    |
+    v  [Notebook 2: Merge by Data Stream and Data Types]
 *_raw.parquet
     |
     v  [Notebook 3: QC -- calibrations, physical limits, flags, manual corrections]
