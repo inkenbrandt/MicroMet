@@ -89,6 +89,8 @@ Create compiled and clean versions of data from each data stream (e.g., CSFlux w
 
 **Notebook:** `2_create_raw_data.ipynb`
 
+Assemble multiple preprocessed files into final datasets and manage any datetime shifts
+
 1. **Load preprocessed parquets** for each data stream (CSFlux web/datalogger, AmeriFlux eddy web/datalogger, MetStats, MetAF)
 2. **Compare and merge eddy data** -- CSFlux and AmeriFlux eddy streams are compared for differences; the AmeriFlux stream is primary, with CSFlux filling gaps and providing unique columns (e.g., `G_PLATE`, diagnostic fields)
 3. **Compare and merge met data** -- MetStats and MetAF streams are compared and combined
