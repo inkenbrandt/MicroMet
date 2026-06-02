@@ -278,14 +278,14 @@ class AlfalfaHeightParams:
     rate: float = 1.9  # cm/day (linear) OR day^-1 (k) depending on model
     model: str = "exp"  # 'linear', 'exp', 'logistic'
     time_mode: str = "days"  # 'days' or 'gdd'
-    tbase_c: float = 5.0  # 41°F
-    tcap_c: Optional[float] = None  # optional high-temp cap for GDD calc
+    tbase_c: float = 5.0  # 41°F 
+    tcap_c: Optional[float] = None  # optional high-temp cap for GDD calc; iif provided, Tmax and Tmin are capped at tcap_c before averaging
     enforce_bounds: bool = True
 
     # Dormancy behavior
-    dormancy_mode: str = "doy"  # 'doy', 'temp', or 'none'
-    doy_start: Tuple[int, int] = (3, 1)
-    doy_end: Tuple[int, int] = (10, 31)
+    dormancy_mode: str = "doy"  # 'doy', 'temp', or 'none'; under temp, active when rolling mean(tmean_c) over 'greenup_consecutive_days'  >= tbase_c
+    doy_start: Tuple[int, int] = (3, 1) # start date of active season if dormancy_mode is 'doy'
+    doy_end: Tuple[int, int] = (10, 31) # end date of active season if dormancy_mode is 'doy'
     tmean_col: str = "tmean_c"  # used if dormancy_mode='temp' and weather provided
     greenup_consecutive_days: int = 5
 
