@@ -275,7 +275,7 @@ def is_active_season_by_temp(
 class AlfalfaHeightParams:
     h_resid_cm: float = 7.5  # ~3 inches
     h_max_cm: float = 75.0  # management-dependent
-    rate: float = 1.9  # cm/day (linear) OR day^-1 (k) depending on model
+    rate: Union[float, Sequence[float]] = 0.008 # cm/day (linear) OR day^-1 (k) depending on model
     model: str = "exp"  # 'linear', 'exp', 'logistic'
     time_mode: str = "days"  # 'days' or 'gdd'
     tbase_c: float = 5.0  # 41°F 
@@ -306,20 +306,6 @@ def simulate_alfalfa_height_single_field(
 ) -> pd.Series:
     """
     Simulate daily canopy height for one field.
-
-    Inputs:
-      dates: array-like dates (any frequency) -> internally expanded to daily.
-      cut_dates: dates of harvest events for this field.
-      params: AlfalfaHeightParams
-      weather: optional daily DataFrame indexed by date with columns:
-        - 'tmin_c', 'tmax_c' (for GDD) OR 'gdd'
-        - optional 'tmean_c' (for temp stress / temp-based dormancy)
-      cut_effect:
-        - 'post': cut date height is residual
-        - 'pre': cut date height is computed as regrowth; cut applied next day
-
-    Output:
-      pd.Series indexed by daily dates, values in cm.
     """
     idx = make_daily_index(dates)
     date_min, date_max = idx.min(), idx.max()
@@ -339,8 +325,6 @@ def simulate_alfalfa_height_single_field(
             gdd_col="gdd",
         )
         if gdd is None:
-            # Fall back gracefully to day-based time if weather not available
-            # (You could also raise an error; this keeps the function usable.)
             pass
 
     # Determine active/dormant days
@@ -385,7 +369,11 @@ def simulate_alfalfa_height_single_field(
 
     # Track "last cut (regrowth start)" date index position
     last_reset_pos = 0
-    # Initialize at residual in dormant season; at minimum we enforce h_resid baseline
+    
+    # --- ADDED FOR VARIABLE RATES ---
+    current_cut_idx = 0  # Tracks which cutting cycle rate to use
+    
+    # Initialize at residual in dormant season
     heights[0] = params.h_resid_cm
 
     for i in range(1, len(idx)):
@@ -398,12 +386,13 @@ def simulate_alfalfa_height_single_field(
             if is_cut:
                 heights[i] = params.h_resid_cm
                 last_reset_pos = i
+                current_cut_idx += 1  # <-- ADDED: Move to next rate
                 continue
         elif cut_effect.lower() == "pre":
-            # If cut is "pre", treat cut as occurring end-of-day -> reset on next day
             if idx[i - 1] in cut_set:
                 heights[i] = params.h_resid_cm
                 last_reset_pos = i
+                current_cut_idx += 1  # <-- ADDED: Move to next rate
                 continue
         else:
             raise ValueError("cut_effect must be 'post' or 'pre'")
@@ -413,24 +402,44 @@ def simulate_alfalfa_height_single_field(
             heights[i] = max(params.h_resid_cm, heights[i - 1])
             continue
 
-        # Compute time-since-reset
-        if params.time_mode.lower() == "gdd" and gdd is not None:
-            # cumulative GDD since last_reset_pos (exclude reset day)
-            tt = float(gdd.iloc[last_reset_pos + 1 : i + 1].sum())
-            time_var = np.array([tt], dtype=float)
+        # --- ADDED: Dynamic Rate Selection ---
+        if isinstance(params.rate, (list, tuple, np.ndarray, pd.Series)):
+            if current_cut_idx < len(params.rate):
+                current_k = float(params.rate[current_cut_idx])
+            else:
+                current_k = float(params.rate[-1])  # Fallback to the last rate in the list
         else:
-            dt_days = float(i - last_reset_pos)
-            time_var = np.array([dt_days], dtype=float)
+            current_k = float(params.rate)  # Fallback if it's a single float
 
-        # Growth model
-        h = float(
-            growth_fn(time_var, params.h_resid_cm, params.h_max_cm, params.rate)[0]
+        # Compute time-since-reset
+        # 1. Calculate time variables for both TODAY and YESTERDAY
+        if params.time_mode.lower() == "gdd" and gdd is not None:
+            tt_today = float(gdd.iloc[last_reset_pos + 1 : i + 1].sum())
+            tt_yesterday = float(gdd.iloc[last_reset_pos + 1 : i].sum())
+            time_var_today = np.array([tt_today], dtype=float)
+            time_var_prev = np.array([tt_yesterday], dtype=float)
+        else:
+            dt_days_today = float(i - last_reset_pos)
+            dt_days_prev = float(i - 1 - last_reset_pos)
+            time_var_today = np.array([dt_days_today], dtype=float)
+            time_var_prev = np.array([dt_days_prev], dtype=float)
+
+        # 2. Get ideal curve heights for today and yesterday (UPDATED TO USE current_k)
+        h_ideal_today = float(
+            growth_fn(time_var_today, params.h_resid_cm, params.h_max_cm, current_k)[0]
+        )
+        h_ideal_prev = float(
+            growth_fn(time_var_prev, params.h_resid_cm, params.h_max_cm, current_k)[0]
         )
 
-        # Apply stress (simple multiplicative factor on "net regrowth" above stubble)
-        # i.e., stubble remains even if stress is 0
-        net = max(0.0, h - params.h_resid_cm)
-        h_stressed = params.h_resid_cm + net * float(temp_stress[i])
+        # 3. Isolate JUST today's potential growth delta
+        delta_growth = max(0.0, h_ideal_today - h_ideal_prev)
+
+        # 4. Stress ONLY today's incremental growth
+        delta_stressed = delta_growth * float(temp_stress[i])
+
+        # 5. Build on top of yesterday's actual, real-world height
+        h_stressed = heights[i - 1] + delta_stressed
 
         # Enforce bounds
         if params.enforce_bounds:
@@ -439,6 +448,7 @@ def simulate_alfalfa_height_single_field(
         heights[i] = h_stressed
 
     return pd.Series(heights, index=idx, name="height_cm")
+
 
 
 def simulate_alfalfa_height_multi_field(
