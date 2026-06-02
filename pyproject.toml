@@ -45,6 +45,11 @@ test = [
     "pytest-cov>=2.0",
 ]
 
+jupyter = [
+    "notebook",
+    "ipykernel",
+]
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 packages = ['micromet']
