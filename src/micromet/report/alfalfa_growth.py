@@ -305,7 +305,7 @@ def simulate_alfalfa_height_single_field(
     cut_effect: str = "post",  # 'post' means height on cut date is stubble; 'pre' means apply cut next day
 ) -> pd.DataFrame:  
     """
-    Simulate daily canopy height for one field.
+    Simulate daily canopy height for one field with dynamic k-rates and dynamic grazing height ceilings.
     """
     idx = make_daily_index(dates)
     date_min, date_max = idx.min(), idx.max()
@@ -324,8 +324,6 @@ def simulate_alfalfa_height_single_field(
             tmax_col="tmax_c",
             gdd_col="gdd",
         )
-        if gdd is None:
-            pass
 
     # Determine active/dormant days
     if params.dormancy_mode.lower() == "none":
@@ -365,7 +363,7 @@ def simulate_alfalfa_height_single_field(
     
     # --- Set up arrays for BOTH height and the active k-rate ---
     heights = np.full(len(idx), np.nan, dtype=float)
-    k_values = np.full(len(idx), np.nan, dtype=float)  # <-- NEW: Trackers for k
+    k_values = np.full(len(idx), np.nan, dtype=float)  
 
     last_reset_pos = 0
     current_cut_idx = 0  
@@ -381,28 +379,22 @@ def simulate_alfalfa_height_single_field(
 
     for i in range(1, len(idx)):
         d = idx[i]
+        
+        # Late fall drawdown execution
         if d >= drawdown_start_date:
-            # 1. Capture the starting height on the very first day of drawdown
             if height_at_drawdown_start == None:
                 height_at_drawdown_start = float(heights[i - 1])
                 
-            # 2. Calculate how far along we are (from 0.0 to 1.0)
             days_into_drawdown = (d - drawdown_start_date).days
-            
-            # 3. Linearly interpolate down to the stubble floor
-            # As days_into_drawdown approaches 14, fraction goes from 1.0 down to 0.0
             fraction = max(0.0, (drawdown_window - days_into_drawdown) / drawdown_window)
             
             heights[i] = params.h_resid_cm + (height_at_drawdown_start - params.h_resid_cm) * fraction
-            
-            # Log a neutral k-rate during drawdown and skip the rest of the growth loop
             k_values[i] = 0.0
             continue
 
         is_cut = d in cut_set
 
-        # --- MOVE DYNAMIC K-SELECTION TO THE TOP OF THE LOOP ---
-        # Moving this here ensures k_values[i] gets logged even on cut/dormant days before a 'continue'
+        # --- DYNAMIC K-SELECTION ---
         if isinstance(params.rate, (list, tuple, np.ndarray, pd.Series)):
             if current_cut_idx < len(params.rate):
                 current_k = float(params.rate[current_cut_idx])
@@ -411,7 +403,22 @@ def simulate_alfalfa_height_single_field(
         else:
             current_k = float(params.rate)
             
-        k_values[i] = current_k  # <-- NEW: Log the exact rate active today
+        k_values[i] = current_k  
+
+        # --- NEW: DYNAMIC H_MAX CEILING SELECTION ---
+        if hasattr(params, 'grazing_height') and params.grazing_height is not None:
+            if isinstance(params.grazing_height, (list, tuple, np.ndarray, pd.Series)):
+                if current_cut_idx < len(params.grazing_height):
+                    cycle_target = params.grazing_height[current_cut_idx]
+                else:
+                    cycle_target = params.grazing_height[-1]
+            else:
+                cycle_target = params.grazing_height
+            
+            # If the current cycle has a grazing cap assigned, use it. Otherwise, use standard h_max_cm.
+            current_h_max = float(cycle_target) if cycle_target is not None else params.h_max_cm
+        else:
+            current_h_max = params.h_max_cm
 
         # Apply cut event
         if cut_effect.lower() == "post":
@@ -446,16 +453,16 @@ def simulate_alfalfa_height_single_field(
             time_var_today = np.array([dt_days_today], dtype=float)
             time_var_prev = np.array([dt_days_prev], dtype=float)
 
-        # Get ideal curve heights (using current_k)
-        h_ideal_today = float(growth_fn(time_var_today, params.h_resid_cm, params.h_max_cm, current_k)[0])
-        h_ideal_prev = float(growth_fn(time_var_prev, params.h_resid_cm, params.h_max_cm, current_k)[0])
+        # Get ideal curve heights (Updated to use current_h_max)
+        h_ideal_today = float(growth_fn(time_var_today, params.h_resid_cm, current_h_max, current_k)[0])
+        h_ideal_prev = float(growth_fn(time_var_prev, params.h_resid_cm, current_h_max, current_k)[0])
 
         delta_growth = max(0.0, h_ideal_today - h_ideal_prev)
         delta_stressed = delta_growth * float(temp_stress[i])
         h_stressed = heights[i - 1] + delta_stressed
 
         if params.enforce_bounds:
-            h_stressed = max(params.h_resid_cm, min(params.h_max_cm, h_stressed))
+            h_stressed = max(params.h_resid_cm, min(current_h_max, h_stressed))
 
         heights[i] = h_stressed
 
@@ -463,7 +470,6 @@ def simulate_alfalfa_height_single_field(
         "height_cm": heights,
         "active_k": k_values
     }, index=idx)
-
 
 
 def simulate_alfalfa_height_multi_field(
