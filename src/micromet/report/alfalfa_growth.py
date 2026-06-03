@@ -281,7 +281,7 @@ class AlfalfaHeightParams:
     tbase_c: float = 5.0  # 41°F 
     tcap_c: Optional[float] = None  # optional high-temp cap for GDD calc; iif provided, Tmax and Tmin are capped at tcap_c before averaging
     enforce_bounds: bool = True
-
+    grazing_height: Optional[Union[float, list, tuple, np.ndarray]] = None
     # Dormancy behavior
     dormancy_mode: str = "doy"  # 'doy', 'temp', or 'none'; under temp, active when rolling mean(tmean_c) over 'greenup_consecutive_days'  >= tbase_c
     doy_start: Tuple[int, int] = (3, 1) # start date of active season if dormancy_mode is 'doy'
@@ -303,7 +303,7 @@ def simulate_alfalfa_height_single_field(
     params: AlfalfaHeightParams,
     weather: Optional[pd.DataFrame] = None,
     cut_effect: str = "post",  # 'post' means height on cut date is stubble; 'pre' means apply cut next day
-) -> pd.Series:
+) -> pd.DataFrame:  
     """
     Simulate daily canopy height for one field.
     """
@@ -361,38 +361,70 @@ def simulate_alfalfa_height_single_field(
         temp_stress = np.ones(len(idx), dtype=float)
 
     growth_fn = choose_growth_fn(params.model)
-
-    # Convert cut dates to a set for fast lookup
     cut_set = set(pd.DatetimeIndex(cuts))
-
+    
+    # --- Set up arrays for BOTH height and the active k-rate ---
     heights = np.full(len(idx), np.nan, dtype=float)
+    k_values = np.full(len(idx), np.nan, dtype=float)  # <-- NEW: Trackers for k
 
-    # Track "last cut (regrowth start)" date index position
     last_reset_pos = 0
+    current_cut_idx = 0  
     
-    # --- ADDED FOR VARIABLE RATES ---
-    current_cut_idx = 0  # Tracks which cutting cycle rate to use
-    
-    # Initialize at residual in dormant season
     heights[0] = params.h_resid_cm
+    # Initialize the first day's k-rate
+    k_values[0] = float(params.rate[0]) if isinstance(params.rate, (list, tuple, np.ndarray, pd.Series)) else float(params.rate)
+
+    end_date = idx[-1]
+    drawdown_window = 14  # Days to transition down
+    drawdown_start_date = end_date - pd.Timedelta(days=drawdown_window)
+    height_at_drawdown_start = None
 
     for i in range(1, len(idx)):
         d = idx[i]
+        if d >= drawdown_start_date:
+            # 1. Capture the starting height on the very first day of drawdown
+            if height_at_drawdown_start == None:
+                height_at_drawdown_start = float(heights[i - 1])
+                
+            # 2. Calculate how far along we are (from 0.0 to 1.0)
+            days_into_drawdown = (d - drawdown_start_date).days
+            
+            # 3. Linearly interpolate down to the stubble floor
+            # As days_into_drawdown approaches 14, fraction goes from 1.0 down to 0.0
+            fraction = max(0.0, (drawdown_window - days_into_drawdown) / drawdown_window)
+            
+            heights[i] = params.h_resid_cm + (height_at_drawdown_start - params.h_resid_cm) * fraction
+            
+            # Log a neutral k-rate during drawdown and skip the rest of the growth loop
+            k_values[i] = 0.0
+            continue
 
-        # Apply cut event
         is_cut = d in cut_set
 
+        # --- MOVE DYNAMIC K-SELECTION TO THE TOP OF THE LOOP ---
+        # Moving this here ensures k_values[i] gets logged even on cut/dormant days before a 'continue'
+        if isinstance(params.rate, (list, tuple, np.ndarray, pd.Series)):
+            if current_cut_idx < len(params.rate):
+                current_k = float(params.rate[current_cut_idx])
+            else:
+                current_k = float(params.rate[-1])
+        else:
+            current_k = float(params.rate)
+            
+        k_values[i] = current_k  # <-- NEW: Log the exact rate active today
+
+        # Apply cut event
         if cut_effect.lower() == "post":
             if is_cut:
                 heights[i] = params.h_resid_cm
                 last_reset_pos = i
-                current_cut_idx += 1  # <-- ADDED: Move to next rate
+                current_cut_idx += 1  
                 continue
         elif cut_effect.lower() == "pre":
             if idx[i - 1] in cut_set:
                 heights[i] = params.h_resid_cm
                 last_reset_pos = i
-                current_cut_idx += 1  # <-- ADDED: Move to next rate
+                current_cut_idx += 1  
                 continue
         else:
             raise ValueError("cut_effect must be 'post' or 'pre'")
@@ -402,17 +434,7 @@ def simulate_alfalfa_height_single_field(
             heights[i] = max(params.h_resid_cm, heights[i - 1])
             continue
 
-        # --- ADDED: Dynamic Rate Selection ---
-        if isinstance(params.rate, (list, tuple, np.ndarray, pd.Series)):
-            if current_cut_idx < len(params.rate):
-                current_k = float(params.rate[current_cut_idx])
-            else:
-                current_k = float(params.rate[-1])  # Fallback to the last rate in the list
-        else:
-            current_k = float(params.rate)  # Fallback if it's a single float
-
         # Compute time-since-reset
-        # 1. Calculate time variables for both TODAY and YESTERDAY
         if params.time_mode.lower() == "gdd" and gdd is not None:
             tt_today = float(gdd.iloc[last_reset_pos + 1 : i + 1].sum())
             tt_yesterday = float(gdd.iloc[last_reset_pos + 1 : i].sum())
@@ -424,30 +446,23 @@ def simulate_alfalfa_height_single_field(
             time_var_today = np.array([dt_days_today], dtype=float)
             time_var_prev = np.array([dt_days_prev], dtype=float)
 
-        # 2. Get ideal curve heights for today and yesterday (UPDATED TO USE current_k)
-        h_ideal_today = float(
-            growth_fn(time_var_today, params.h_resid_cm, params.h_max_cm, current_k)[0]
-        )
-        h_ideal_prev = float(
-            growth_fn(time_var_prev, params.h_resid_cm, params.h_max_cm, current_k)[0]
-        )
+        # Get ideal curve heights (using current_k)
+        h_ideal_today = float(growth_fn(time_var_today, params.h_resid_cm, params.h_max_cm, current_k)[0])
+        h_ideal_prev = float(growth_fn(time_var_prev, params.h_resid_cm, params.h_max_cm, current_k)[0])
 
-        # 3. Isolate JUST today's potential growth delta
         delta_growth = max(0.0, h_ideal_today - h_ideal_prev)
-
-        # 4. Stress ONLY today's incremental growth
         delta_stressed = delta_growth * float(temp_stress[i])
-
-        # 5. Build on top of yesterday's actual, real-world height
         h_stressed = heights[i - 1] + delta_stressed
 
-        # Enforce bounds
         if params.enforce_bounds:
             h_stressed = max(params.h_resid_cm, min(params.h_max_cm, h_stressed))
 
         heights[i] = h_stressed
 
-    return pd.Series(heights, index=idx, name="height_cm")
+    return pd.DataFrame({
+        "height_cm": heights,
+        "active_k": k_values
+    }, index=idx)
 
 
 
