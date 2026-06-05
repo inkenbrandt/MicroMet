@@ -516,3 +516,91 @@ def simulate_alfalfa_height_multi_field(
     df = pd.DataFrame(out, index=idx)
     df.index.name = "date"
     return df
+
+
+import pandas as pd
+
+def generate_field2_heights(field1_data, field1_cuts, field2_cuts, h_resid_cm, catchup_days=14):
+    """
+    Generate a daily crop height profile for a secondary field (Field 2) by 
+    copying and adjusting the simulated growth curve of a primary field (Field 1).
+    
+    This function synchronizes two field curves by evaluating cutting timelines 
+    cycle-by-cycle. It resolves mismatches caused by staggered cutting dates 
+    using a linear blend to eliminate unnatural vertical "jumps" in height data.
+
+    Logic Scenarios:
+    ----------------
+    Scenario A (Field 1 cut first, c1 < c2):
+        - Field 2 holds Field 1's last pre-cut maximum height during the gap.
+        - On its actual cut date (c2), Field 2 drops to `h_resid_cm`.
+        - For the next `catchup_days`, Field 2's height is linearly scaled from 
+          residual height back up to match Field 1's ongoing active growth curve.
+
+    Scenario B (Field 2 cut first, c2 < c1):
+        - Field 2 drops immediately to `h_resid_cm` on its early cut date (c2).
+        - Field 2 stays flat at baseline residual height until Field 1 is cut (c1).
+        - Once both fields have been cut, they naturally re-align and grow together.
+
+    Args:
+        field1_data (pd.Series): Daily height data for Field 1, indexed by datetime.
+        field1_cuts (iterable): Chronological collection of cutting dates for Field 1 
+            (can be strings, datetimes, or Timestamps).
+        field2_cuts (iterable): Chronological collection of cutting dates for Field 2 
+            (must pair 1:1 in sequence with Field 1 cuts).
+        h_resid_cm (float): The baseline post-harvest residual/stubble height (minimum height).
+        catchup_days (int, optional): The number of days allowed for Field 2 to smoothly 
+            ramp up and catch up to Field 1's growth line in Scenario A. Defaults to 14.
+
+    Returns:
+        pd.Series: A new Pandas Series containing the daily calculated heights for Field 2, 
+            matching the exact index of `field1_data`.
+
+    Raises:
+        IndexError: If the number of cuts in `field1_cuts` and `field2_cuts` do not match.
+    """
+    # Start by making a clean copy of Field 1's height series
+    field2_heights = field1_data.copy()
+    
+    # Ensure all cut dates are sorted pandas Timestamps
+    f1_cuts = sorted([pd.to_datetime(d) for d in field1_cuts])
+    f2_cuts = sorted([pd.to_datetime(d) for d in field2_cuts])
+    
+    # Iterate through pairs of cuts cycle-by-cycle
+    for c1, c2 in zip(f1_cuts, f2_cuts):
+        
+        # --- SCENARIO A: Field 1 is cut first ---
+        if c1 < c2:
+            # 1. Get Field 1's height right before it was cut
+            idx_before_c1 = field1_data.index[field1_data.index < c1]
+            if len(idx_before_c1) > 0:
+                h_pre_cut = float(field1_data.loc[idx_before_c1[-1]])
+            else:
+                h_pre_cut = h_resid_cm
+                
+            # 2. Field 2 holds that high pre-cut value until the day before it is cut
+            mismatch_days = field2_heights.index[(field2_heights.index >= c1) & (field2_heights.index < c2)]
+            field2_heights.loc[mismatch_days] = h_pre_cut
+            
+            # 3. Drop Field 2 to residue on its actual cut date
+            if c2 in field2_heights.index:
+                field2_heights.loc[c2] = h_resid_cm
+                
+            # 4. LINEAR FIX: Smoothly blend from h_resid_cm back up to Field 1's active curve
+            for step in range(1, catchup_days + 1):
+                blend_date = c2 + pd.Timedelta(days=step)
+                
+                if blend_date in field2_heights.index:
+                    fraction = step / catchup_days
+                    f1_height_today = float(field1_data.loc[blend_date])
+                    
+                    # Blend formula
+                    field2_heights.loc[blend_date] = h_resid_cm + (f1_height_today - h_resid_cm) * fraction
+                
+        # --- SCENARIO B: Field 2 is cut first ---
+        elif c2 < c1:
+            # Field 2 drops to minimum height immediately and stays there until Field 1 is cut.
+            mismatch_days = field2_heights.index[(field2_heights.index >= c2) & (field2_heights.index <= c1)]
+            field2_heights.loc[mismatch_days] = h_resid_cm
+
+    return field2_heights
