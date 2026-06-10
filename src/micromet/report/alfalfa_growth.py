@@ -472,54 +472,6 @@ def simulate_alfalfa_height_single_field(
     }, index=idx)
 
 
-def simulate_alfalfa_height_multi_field(
-    dates: Union[Sequence, pd.DatetimeIndex],
-    cut_dates_by_field: Mapping[str, Sequence],
-    params_by_field: Optional[Mapping[str, AlfalfaHeightParams]] = None,
-    default_params: Optional[AlfalfaHeightParams] = None,
-    weather_by_field: Optional[Mapping[str, pd.DataFrame]] = None,
-    cut_effect: str = "post",
-) -> pd.DataFrame:
-    """
-    Simulate daily canopy height for multiple fields.
-
-    cut_dates_by_field: dict(field_id -> list of cut dates)
-    params_by_field: optional dict(field_id -> AlfalfaHeightParams)
-    weather_by_field: optional dict(field_id -> daily weather DataFrame)
-
-    Returns DataFrame indexed by daily date, columns=field_id, values in cm.
-    """
-    idx = make_daily_index(dates)
-
-    if default_params is None:
-        default_params = AlfalfaHeightParams()
-
-    out = {}
-    for field_id, cuts in cut_dates_by_field.items():
-        p = default_params
-        if params_by_field is not None and field_id in params_by_field:
-            p = params_by_field[field_id]
-
-        w = None
-        if weather_by_field is not None and field_id in weather_by_field:
-            w = weather_by_field[field_id]
-
-        s = simulate_alfalfa_height_single_field(
-            dates=idx,
-            cut_dates=cuts,
-            params=p,
-            weather=w,
-            cut_effect=cut_effect,
-        )
-        out[field_id] = s
-
-    df = pd.DataFrame(out, index=idx)
-    df.index.name = "date"
-    return df
-
-
-import pandas as pd
-
 def generate_field2_heights(field1_data, field1_cuts, field2_cuts, h_resid_cm, catchup_days=14):
     """
     Generate a daily crop height profile for a secondary field (Field 2) by 
