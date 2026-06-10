@@ -275,13 +275,13 @@ def is_active_season_by_temp(
 class AlfalfaHeightParams:
     h_resid_cm: float = 7.5  # ~3 inches
     h_max_cm: float = 75.0  # management-dependent
-    rate: float = 1.9  # cm/day (linear) OR day^-1 (k) depending on model
+    rate: Union[float, Sequence[float]] = 0.008 # cm/day (linear) OR day^-1 (k) depending on model
     model: str = "exp"  # 'linear', 'exp', 'logistic'
     time_mode: str = "days"  # 'days' or 'gdd'
     tbase_c: float = 5.0  # 41°F 
     tcap_c: Optional[float] = None  # optional high-temp cap for GDD calc; iif provided, Tmax and Tmin are capped at tcap_c before averaging
     enforce_bounds: bool = True
-
+    grazing_height: Optional[Union[float, list, tuple, np.ndarray]] = None
     # Dormancy behavior
     dormancy_mode: str = "doy"  # 'doy', 'temp', or 'none'; under temp, active when rolling mean(tmean_c) over 'greenup_consecutive_days'  >= tbase_c
     doy_start: Tuple[int, int] = (3, 1) # start date of active season if dormancy_mode is 'doy'
@@ -303,23 +303,9 @@ def simulate_alfalfa_height_single_field(
     params: AlfalfaHeightParams,
     weather: Optional[pd.DataFrame] = None,
     cut_effect: str = "post",  # 'post' means height on cut date is stubble; 'pre' means apply cut next day
-) -> pd.Series:
+) -> pd.DataFrame:  
     """
-    Simulate daily canopy height for one field.
-
-    Inputs:
-      dates: array-like dates (any frequency) -> internally expanded to daily.
-      cut_dates: dates of harvest events for this field.
-      params: AlfalfaHeightParams
-      weather: optional daily DataFrame indexed by date with columns:
-        - 'tmin_c', 'tmax_c' (for GDD) OR 'gdd'
-        - optional 'tmean_c' (for temp stress / temp-based dormancy)
-      cut_effect:
-        - 'post': cut date height is residual
-        - 'pre': cut date height is computed as regrowth; cut applied next day
-
-    Output:
-      pd.Series indexed by daily dates, values in cm.
+    Simulate daily canopy height for one field with dynamic k-rates and dynamic grazing height ceilings.
     """
     idx = make_daily_index(dates)
     date_min, date_max = idx.min(), idx.max()
@@ -338,10 +324,6 @@ def simulate_alfalfa_height_single_field(
             tmax_col="tmax_c",
             gdd_col="gdd",
         )
-        if gdd is None:
-            # Fall back gracefully to day-based time if weather not available
-            # (You could also raise an error; this keeps the function usable.)
-            pass
 
     # Determine active/dormant days
     if params.dormancy_mode.lower() == "none":
@@ -377,33 +359,79 @@ def simulate_alfalfa_height_single_field(
         temp_stress = np.ones(len(idx), dtype=float)
 
     growth_fn = choose_growth_fn(params.model)
-
-    # Convert cut dates to a set for fast lookup
     cut_set = set(pd.DatetimeIndex(cuts))
-
+    
+    # --- Set up arrays for BOTH height and the active k-rate ---
     heights = np.full(len(idx), np.nan, dtype=float)
+    k_values = np.full(len(idx), np.nan, dtype=float)  
 
-    # Track "last cut (regrowth start)" date index position
     last_reset_pos = 0
-    # Initialize at residual in dormant season; at minimum we enforce h_resid baseline
+    current_cut_idx = 0  
+    
     heights[0] = params.h_resid_cm
+    # Initialize the first day's k-rate
+    k_values[0] = float(params.rate[0]) if isinstance(params.rate, (list, tuple, np.ndarray, pd.Series)) else float(params.rate)
+
+    end_date = idx[-1]
+    drawdown_window = 14  # Days to transition down
+    drawdown_start_date = end_date - pd.Timedelta(days=drawdown_window)
+    height_at_drawdown_start = None
 
     for i in range(1, len(idx)):
         d = idx[i]
+        
+        # Late fall drawdown execution
+        if d >= drawdown_start_date:
+            if height_at_drawdown_start == None:
+                height_at_drawdown_start = float(heights[i - 1])
+                
+            days_into_drawdown = (d - drawdown_start_date).days
+            fraction = max(0.0, (drawdown_window - days_into_drawdown) / drawdown_window)
+            
+            heights[i] = params.h_resid_cm + (height_at_drawdown_start - params.h_resid_cm) * fraction
+            k_values[i] = 0.0
+            continue
 
-        # Apply cut event
         is_cut = d in cut_set
 
+        # --- DYNAMIC K-SELECTION ---
+        if isinstance(params.rate, (list, tuple, np.ndarray, pd.Series)):
+            if current_cut_idx < len(params.rate):
+                current_k = float(params.rate[current_cut_idx])
+            else:
+                current_k = float(params.rate[-1])
+        else:
+            current_k = float(params.rate)
+            
+        k_values[i] = current_k  
+
+        # --- NEW: DYNAMIC H_MAX CEILING SELECTION ---
+        if hasattr(params, 'grazing_height') and params.grazing_height is not None:
+            if isinstance(params.grazing_height, (list, tuple, np.ndarray, pd.Series)):
+                if current_cut_idx < len(params.grazing_height):
+                    cycle_target = params.grazing_height[current_cut_idx]
+                else:
+                    cycle_target = params.grazing_height[-1]
+            else:
+                cycle_target = params.grazing_height
+            
+            # If the current cycle has a grazing cap assigned, use it. Otherwise, use standard h_max_cm.
+            current_h_max = float(cycle_target) if cycle_target is not None else params.h_max_cm
+        else:
+            current_h_max = params.h_max_cm
+
+        # Apply cut event
         if cut_effect.lower() == "post":
             if is_cut:
                 heights[i] = params.h_resid_cm
                 last_reset_pos = i
+                current_cut_idx += 1  
                 continue
         elif cut_effect.lower() == "pre":
-            # If cut is "pre", treat cut as occurring end-of-day -> reset on next day
             if idx[i - 1] in cut_set:
                 heights[i] = params.h_resid_cm
                 last_reset_pos = i
+                current_cut_idx += 1  
                 continue
         else:
             raise ValueError("cut_effect must be 'post' or 'pre'")
@@ -415,73 +443,116 @@ def simulate_alfalfa_height_single_field(
 
         # Compute time-since-reset
         if params.time_mode.lower() == "gdd" and gdd is not None:
-            # cumulative GDD since last_reset_pos (exclude reset day)
-            tt = float(gdd.iloc[last_reset_pos + 1 : i + 1].sum())
-            time_var = np.array([tt], dtype=float)
+            tt_today = float(gdd.iloc[last_reset_pos + 1 : i + 1].sum())
+            tt_yesterday = float(gdd.iloc[last_reset_pos + 1 : i].sum())
+            time_var_today = np.array([tt_today], dtype=float)
+            time_var_prev = np.array([tt_yesterday], dtype=float)
         else:
-            dt_days = float(i - last_reset_pos)
-            time_var = np.array([dt_days], dtype=float)
+            dt_days_today = float(i - last_reset_pos)
+            dt_days_prev = float(i - 1 - last_reset_pos)
+            time_var_today = np.array([dt_days_today], dtype=float)
+            time_var_prev = np.array([dt_days_prev], dtype=float)
 
-        # Growth model
-        h = float(
-            growth_fn(time_var, params.h_resid_cm, params.h_max_cm, params.rate)[0]
-        )
+        # Get ideal curve heights (Updated to use current_h_max)
+        h_ideal_today = float(growth_fn(time_var_today, params.h_resid_cm, current_h_max, current_k)[0])
+        h_ideal_prev = float(growth_fn(time_var_prev, params.h_resid_cm, current_h_max, current_k)[0])
 
-        # Apply stress (simple multiplicative factor on "net regrowth" above stubble)
-        # i.e., stubble remains even if stress is 0
-        net = max(0.0, h - params.h_resid_cm)
-        h_stressed = params.h_resid_cm + net * float(temp_stress[i])
+        delta_growth = max(0.0, h_ideal_today - h_ideal_prev)
+        delta_stressed = delta_growth * float(temp_stress[i])
+        h_stressed = heights[i - 1] + delta_stressed
 
-        # Enforce bounds
         if params.enforce_bounds:
-            h_stressed = max(params.h_resid_cm, min(params.h_max_cm, h_stressed))
+            h_stressed = max(params.h_resid_cm, min(current_h_max, h_stressed))
 
         heights[i] = h_stressed
 
-    return pd.Series(heights, index=idx, name="height_cm")
+    return pd.DataFrame({
+        "height_cm": heights,
+        "active_k": k_values
+    }, index=idx)
 
 
-def simulate_alfalfa_height_multi_field(
-    dates: Union[Sequence, pd.DatetimeIndex],
-    cut_dates_by_field: Mapping[str, Sequence],
-    params_by_field: Optional[Mapping[str, AlfalfaHeightParams]] = None,
-    default_params: Optional[AlfalfaHeightParams] = None,
-    weather_by_field: Optional[Mapping[str, pd.DataFrame]] = None,
-    cut_effect: str = "post",
-) -> pd.DataFrame:
+def generate_field2_heights(field1_data, field1_cuts, field2_cuts, h_resid_cm, catchup_days=14):
     """
-    Simulate daily canopy height for multiple fields.
+    Generate a daily crop height profile for a secondary field (Field 2) by 
+    copying and adjusting the simulated growth curve of a primary field (Field 1).
+    
+    This function synchronizes two field curves by evaluating cutting timelines 
+    cycle-by-cycle. It resolves mismatches caused by staggered cutting dates 
+    using a linear blend to eliminate unnatural vertical "jumps" in height data.
 
-    cut_dates_by_field: dict(field_id -> list of cut dates)
-    params_by_field: optional dict(field_id -> AlfalfaHeightParams)
-    weather_by_field: optional dict(field_id -> daily weather DataFrame)
+    Logic Scenarios:
+    ----------------
+    Scenario A (Field 1 cut first, c1 < c2):
+        - Field 2 holds Field 1's last pre-cut maximum height during the gap.
+        - On its actual cut date (c2), Field 2 drops to `h_resid_cm`.
+        - For the next `catchup_days`, Field 2's height is linearly scaled from 
+          residual height back up to match Field 1's ongoing active growth curve.
 
-    Returns DataFrame indexed by daily date, columns=field_id, values in cm.
+    Scenario B (Field 2 cut first, c2 < c1):
+        - Field 2 drops immediately to `h_resid_cm` on its early cut date (c2).
+        - Field 2 stays flat at baseline residual height until Field 1 is cut (c1).
+        - Once both fields have been cut, they naturally re-align and grow together.
+
+    Args:
+        field1_data (pd.Series): Daily height data for Field 1, indexed by datetime.
+        field1_cuts (iterable): Chronological collection of cutting dates for Field 1 
+            (can be strings, datetimes, or Timestamps).
+        field2_cuts (iterable): Chronological collection of cutting dates for Field 2 
+            (must pair 1:1 in sequence with Field 1 cuts).
+        h_resid_cm (float): The baseline post-harvest residual/stubble height (minimum height).
+        catchup_days (int, optional): The number of days allowed for Field 2 to smoothly 
+            ramp up and catch up to Field 1's growth line in Scenario A. Defaults to 14.
+
+    Returns:
+        pd.Series: A new Pandas Series containing the daily calculated heights for Field 2, 
+            matching the exact index of `field1_data`.
+
+    Raises:
+        IndexError: If the number of cuts in `field1_cuts` and `field2_cuts` do not match.
     """
-    idx = make_daily_index(dates)
+    # Start by making a clean copy of Field 1's height series
+    field2_heights = field1_data.copy()
+    
+    # Ensure all cut dates are sorted pandas Timestamps
+    f1_cuts = sorted([pd.to_datetime(d) for d in field1_cuts])
+    f2_cuts = sorted([pd.to_datetime(d) for d in field2_cuts])
+    
+    # Iterate through pairs of cuts cycle-by-cycle
+    for c1, c2 in zip(f1_cuts, f2_cuts):
+        
+        # --- SCENARIO A: Field 1 is cut first ---
+        if c1 < c2:
+            # 1. Get Field 1's height right before it was cut
+            idx_before_c1 = field1_data.index[field1_data.index < c1]
+            if len(idx_before_c1) > 0:
+                h_pre_cut = float(field1_data.loc[idx_before_c1[-1]])
+            else:
+                h_pre_cut = h_resid_cm
+                
+            # 2. Field 2 holds that high pre-cut value until the day before it is cut
+            mismatch_days = field2_heights.index[(field2_heights.index >= c1) & (field2_heights.index < c2)]
+            field2_heights.loc[mismatch_days] = h_pre_cut
+            
+            # 3. Drop Field 2 to residue on its actual cut date
+            if c2 in field2_heights.index:
+                field2_heights.loc[c2] = h_resid_cm
+                
+            # 4. LINEAR FIX: Smoothly blend from h_resid_cm back up to Field 1's active curve
+            for step in range(1, catchup_days + 1):
+                blend_date = c2 + pd.Timedelta(days=step)
+                
+                if blend_date in field2_heights.index:
+                    fraction = step / catchup_days
+                    f1_height_today = float(field1_data.loc[blend_date])
+                    
+                    # Blend formula
+                    field2_heights.loc[blend_date] = h_resid_cm + (f1_height_today - h_resid_cm) * fraction
+                
+        # --- SCENARIO B: Field 2 is cut first ---
+        elif c2 < c1:
+            # Field 2 drops to minimum height immediately and stays there until Field 1 is cut.
+            mismatch_days = field2_heights.index[(field2_heights.index >= c2) & (field2_heights.index <= c1)]
+            field2_heights.loc[mismatch_days] = h_resid_cm
 
-    if default_params is None:
-        default_params = AlfalfaHeightParams()
-
-    out = {}
-    for field_id, cuts in cut_dates_by_field.items():
-        p = default_params
-        if params_by_field is not None and field_id in params_by_field:
-            p = params_by_field[field_id]
-
-        w = None
-        if weather_by_field is not None and field_id in weather_by_field:
-            w = weather_by_field[field_id]
-
-        s = simulate_alfalfa_height_single_field(
-            dates=idx,
-            cut_dates=cuts,
-            params=p,
-            weather=w,
-            cut_effect=cut_effect,
-        )
-        out[field_id] = s
-
-    df = pd.DataFrame(out, index=idx)
-    df.index.name = "date"
-    return df
+    return field2_heights

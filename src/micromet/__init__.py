@@ -35,6 +35,8 @@ from .qaqc import data_cleaning
 from .report import easyflux_footprint, alfalfa_growth
 from .report.alfalfa_growth import (
     simulate_alfalfa_height_multi_field,
+    simulate_alfalfa_height_single_field,
+    generate_field2_heights,
     AlfalfaHeightParams,
 )
 from .format.transformers import (
