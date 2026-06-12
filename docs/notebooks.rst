@@ -60,6 +60,6 @@ Analysis and Utility Notebooks
      - Retrieves gap-filled reference data from the UGS database and performs meteorological variable imputation.
    * - ``crop_height_example_alfalfa.ipynb``
      - Simulates alfalfa canopy height using growing degree days via ``report.alfalfa_growth.simulate_alfalfa_height_single_field()``, calibrated with data from Wellington, UT (January 2023 – December 2024).
-  * - ``crop_height_example_corn.ipynb``
+   * - ``crop_height_example_corn.ipynb``
     - Simulates corn canopy height using logistic model via ``report.alfalfa_growth.simulate_alfalfa_height_single_field()``, calibrated with data from Green River, UT (January 2025 – December 2025).
 
