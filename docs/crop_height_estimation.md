@@ -24,7 +24,7 @@ Optionally, the user can analyze satellite data from Planet, Sentinel, or anothe
 
 ## Step-by-Step Summary
 
-### Step 1 -- Create camera time lapse
+### Step 1 -- Create Camera Time Lapse
 
 Create monthly time lapse videos from station cameras and review videos for list of cut dates and approximate growing season start and end dates
 
@@ -36,35 +36,20 @@ Create monthly time lapse videos from station cameras and review videos for list
 
 ---
 
-### Steps 2 and 3 -- Create Raw Dataset
+### Steps 2 and 3 -- Create NDVI Time Series Data (Optional)
 
-Assemble multiple preprocessed files into final datasets and manage any datetime shifts
+Compile satellite data into time series files and obtain NDVI values and cut date estimates for individual fields.
 
-1. Load preprocessed parquets for each data stream (CSFlux web/datalogger, AmeriFlux eddy web/datalogger, MetStats, MetAF)
-2. Compare and merge eddy data -- CSFlux and AmeriFlux eddy streams are compared for differences; the AmeriFlux stream is primary, with CSFlux filling gaps and providing unique columns (e.g., G_PLATE, diagnostic fields)
-3. Compare and merge met data -- MetStats and MetAF streams are compared and combined
-4. Detect and correct temporal shifts -- SoilVue sensor data (EC_3_*, K_3_*, SWC_3_*, TS_3_*) may be offset by one time step; cross-correlation detects the lag and a frequency shift corrects it. Historical timestamp misalignments are also identified and corrected.
-5. Combine eddy and met -- merge the two streams, resolve duplicate columns, validate 30-minute interval integrity
-6. Standardize column naming -- apply AmeriFlux positional suffixes (_1_1_1, _1_1_2, etc.)
-7. Trim to station record -- drop data before the station install date (retrieved from the database API)
+1. Download Planet or other satellite imagery or modify script to pull data directly from Google Earth Engine. Imagery should include the full growing season (approximately March 15 to November 30).
+2. Run `pivot_animation_executed`
 
-**Output:** `{station}_{timestart}_{timeend}_raw.parquet`
+**Output:**  `{station}_pivot_timeseries.mp4`, `{station}_pivot_ndvi_multizone_long.csv`, and `{station}_pivot_cut_events.csv.parquet`
 
 ---
 
 ### Step 3 -- Quality Control
 
-[-> Full details](flux_processing_workflow.md#step-3--quality-control)
 
-The largest and most site-specific step:
-
-1. **Calibration corrections** -- date-gated fixes for soil heat flux storage thickness, precipitation calibration factors, and G_PLATE sign inversions
-2. **SoilVue G calculation** -- derive ground heat flux from temperature/moisture profiles using the `soil_heat` library (Johansen thermal model)
-3. **Physical limits** -- `Reformatter.finalize()` applies range limits, converts SWC units, standardizes SSITC encoding, and produces a limit report
-4. **Manual corrections** -- field-day precipitation, G_PLATE zeros, SoilVue spikes, wind direction offsets, sensor-specific spike removal
-5. **Signal-strength flags** -- H2O/CO2 signal flags (0/1/2) and wind direction obstruction flags
-6. **Gap-fill G** -- linear regression between redundant G sources to impute missing values
-
-**Output:** `{station}_{daterange}_qc.parquet` + limit report CSV
+**Output:** `{station}_{daterange}.csv`
 
 ---
