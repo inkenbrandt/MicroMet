@@ -264,6 +264,8 @@ class AlfalfaHeightParams:
         greenup_consecutive_days (int): Number of consecutive days that the rolling 
             mean temperature must remain above `tbase_c` to trigger spring 
             green-up when using 'temp' dormancy. Defaults to 5.
+        drawdown (bool): If True, has crop height gradually decrease to the h_resid_cm
+            over 14 days rather than abruptly dropping down
     """
     h_resid_cm: float = 5
     h_max_cm: float = 75.0  
@@ -280,6 +282,7 @@ class AlfalfaHeightParams:
     doy_end: Tuple[int, int] = (10, 31) 
     tmean_col: str = "tmean_c"  
     greenup_consecutive_days: int = 5
+    drawdown: bool = True
 
 def simulate_alfalfa_height_single_field(
     dates: Union[Sequence, pd.DatetimeIndex],
@@ -288,9 +291,47 @@ def simulate_alfalfa_height_single_field(
     weather: Optional[pd.DataFrame] = None,
     cut_effect: str = "post",
 ) -> pd.DataFrame:  
+    """Simulates daily canopy height and active growth rates for a single alfalfa field.
+
+    This function models alfalfa growth cycle-by-cycle, resetting the canopy height 
+    to a baseline residual stubble value whenever a harvest ('cut') event occurs. 
+    It dynamically selects growth rates (k-values) and maximum height ceilings 
+    (grazing caps) for each specific cutting interval. It also handles seasonal variations, 
+    including temperature-dependent or calendar-based dormancy and a late-autumn 
+    biomass drawdown.
+
+    Growth can be modeled using standard calendar days or accumulated Growing Degree 
+    Days (GDD) if a weather dataset is supplied.
+
+    Args:
+        dates (Union[Sequence, pd.DatetimeIndex]): The target time window for the 
+            simulation. Does not need to be continuous; the function automatically 
+            builds a continuous daily timeline from the minimum to maximum date.
+        cut_dates (Sequence): Dates on which harvest cuts or grazing resets occur. 
+            Can be strings, datetimes, or pandas Timestamps.
+        params (AlfalfaHeightParams): An instance of AlfalfaHeightParams containing 
+            the crop properties, mathematical model type, thresholds, and configuration switches.
+        weather (pd.DataFrame, optional): Daily weather records. Must use a `pd.DatetimeIndex`. 
+            Required if `params.time_mode` is 'gdd' (expects columns: 'tmin_c', 'tmax_c') 
+            or if `params.dormancy_mode` is 'temp' (expects column specified by `params.tmean_col`). 
+            Defaults to None.
+        cut_effect (str, optional): Timing strategy for harvest resets. 
+            - 'post': Canopy height drops to `h_resid_cm` precisely on the cut date. 
+            - 'pre': Height drops to `h_resid_cm` the day *after* the cut date.
+            Defaults to "post".
+
+    Returns:
+        pd.DataFrame: A daily time-series DataFrame indexed by a continuous 
+        `pd.DatetimeIndex` spanning the simulation range. Contains the following columns:
+            - **height_cm** (*float*): The simulated canopy height in centimeters.
+            - **active_k** (*float*): The growth rate constant applied on that specific day.
+
+    Raises:
+        ValueError: If `cut_effect` is not configured to 'post' or 'pre'.
+        ValueError: If `weather` data lacks a `DatetimeIndex` or misses required columns 
+            stipulated by the configured `time_mode` or `dormancy_mode`.
     """
-    Simulate daily canopy height for one field with dynamic k-rates and dynamic grazing height ceilings.
-    """
+    
     idx = make_daily_index(dates)
     date_min, date_max = idx.min(), idx.max()
 
@@ -347,16 +388,17 @@ def simulate_alfalfa_height_single_field(
         d = idx[i]
         
         # Late fall drawdown execution
-        if d >= drawdown_start_date:
-            if height_at_drawdown_start is None:
-                height_at_drawdown_start = float(heights[i - 1])
+        if params.drawdown == True:
+            if d >= drawdown_start_date:
+                if height_at_drawdown_start is None:
+                    height_at_drawdown_start = float(heights[i - 1])
+                    
+                days_into_drawdown = (d - drawdown_start_date).days
+                fraction = max(0.0, (drawdown_window - days_into_drawdown) / drawdown_window)
                 
-            days_into_drawdown = (d - drawdown_start_date).days
-            fraction = max(0.0, (drawdown_window - days_into_drawdown) / drawdown_window)
-            
-            heights[i] = params.h_resid_cm + (height_at_drawdown_start - params.h_resid_cm) * fraction
-            k_values[i] = 0.0
-            continue
+                heights[i] = params.h_resid_cm + (height_at_drawdown_start - params.h_resid_cm) * fraction
+                k_values[i] = 0.0
+                continue
 
         is_cut = d in cut_set
 
