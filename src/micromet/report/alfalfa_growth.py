@@ -127,58 +127,6 @@ def compute_gdd_series(
 
     return None
 
-
-# -----------------------------
-# Environmental modifiers (optional)
-# -----------------------------
-
-
-def temperature_stress_piecewise(
-    tmean_c: Union[np.ndarray, pd.Series],
-    t_min_c: float = 0.0,
-    t_opt_low_c: float = 15.0,
-    t_opt_high_c: float = 27.0,
-    t_stop_c: float = 30.0,
-) -> np.ndarray:
-    """
-    Simple piecewise temperature stress factor in [0, 1].
-    - 0 below t_min_c
-    - 1 between [t_opt_low_c, t_opt_high_c]
-    - linearly declines to 0 between t_opt_high_c and t_stop_c
-    - 0 at/above t_stop_c
-
-    Notes:
-      - Use when you want an explicit hot-temperature slowdown.
-      - Defaults are illustrative; calibrate for Utah fields if you have data.
-    """
-    t = np.asarray(tmean_c, dtype=float)
-    f = np.ones_like(t)
-
-    f[t <= t_min_c] = 0.0
-
-    # below optimal range: ramp up (optional, can keep 1.0 if you prefer)
-    mask_low = (t > t_min_c) & (t < t_opt_low_c)
-    if t_opt_low_c > t_min_c:
-        f[mask_low] = (t[mask_low] - t_min_c) / (t_opt_low_c - t_min_c)
-
-    # optimal range
-    mask_opt = (t >= t_opt_low_c) & (t <= t_opt_high_c)
-    f[mask_opt] = 1.0
-
-    # above optimal: ramp down
-    mask_high = (t > t_opt_high_c) & (t < t_stop_c)
-    if t_stop_c > t_opt_high_c:
-        f[mask_high] = 1.0 - (t[mask_high] - t_opt_high_c) / (t_stop_c - t_opt_high_c)
-
-    f[t >= t_stop_c] = 0.0
-    return np.clip(f, 0.0, 1.0)
-
-
-def default_water_stress_none(n: int) -> np.ndarray:
-    """Default 'no water limitation' factor."""
-    return np.ones(n, dtype=float)
-
-
 # -----------------------------
 # Growth functions
 # -----------------------------
@@ -273,40 +221,117 @@ def is_active_season_by_temp(
 
 @dataclass
 class AlfalfaHeightParams:
-    h_resid_cm: float = 7.5  # ~3 inches
-    h_max_cm: float = 75.0  # management-dependent
-    rate: Union[float, Sequence[float]] = 0.008 # cm/day (linear) OR day^-1 (k) depending on model
-    model: str = "exp"  # 'linear', 'exp', 'logistic'
-    time_mode: str = "days"  # 'days' or 'gdd'
-    tbase_c: float = 5.0  # 41°F 
-    tcap_c: Optional[float] = None  # optional high-temp cap for GDD calc; iif provided, Tmax and Tmin are capped at tcap_c before averaging
+    """Configuration parameters for the alfalfa canopy height simulation model.
+
+    Attributes:
+        h_resid_cm (float): Post-harvest residual or stubble height in centimeters.
+            Serves as the baseline minimum height. Defaults to 5 cm (~2 inches).
+        h_max_cm (float): Default management-dependent maximum potential height 
+            of the alfalfa canopy in centimeters. Defaults to 75.0.
+        rate (float or Sequence[float]): Growth rate parameter. Interpreted as 
+            cm/day for the linear model, or day⁻¹ (k) for exponential/logistic 
+            models. Can accept a single value or a sequence of values mapped 
+            chronologically to each growth cycle. Defaults to 0.008.
+        model (str): The growth mathematical model to deploy. Accepted values 
+            are 'linear', 'exp' (or 'exponential'), and 'logistic'. 
+            Defaults to "exp".
+        time_mode (str): Driving variable for time progression. Use 'days' for 
+            calendar days or 'gdd' for Growing Degree Days. Defaults to "days".
+        tbase_c (float): Base temperature threshold in Celsius below which 
+            alfalfa growth ceases. Used for GDD accumulation and temperature-based 
+            dormancy calculations. Defaults to 5.0 (41°F).
+        tcap_c (float, optional): High-temperature ceiling in Celsius for the 
+            GDD calculation. If provided, daily maximum and minimum temperatures 
+            are capped at this value before averaging. Defaults to None.
+        enforce_bounds (bool): If True, forces the simulated height array to be 
+            strictly clamped between `h_resid_cm` and the current maximum height. 
+            Defaults to True.
+        grazing_height (float or Sequence[float], optional): Target maximum height 
+            ceilings used to cap growth specifically during grazing intervals. Can 
+            be a single value or sequence per harvest cycle. Defaults to None.
+        dormancy_mode (str): Strategy for identifying active vs. dormant periods. 
+            Options are 'doy' (Day of Year range), 'temp' (rolling temperature 
+            threshold), or 'none' (active year-round). Defaults to "temp".
+        doy_start (Tuple[int, int]): Month and day marking the beginning of the 
+            active growing season (Month, Day) when `dormancy_mode` is 'doy'. 
+            Defaults to (3, 1) (March 1st).
+        doy_end (Tuple[int, int]): Month and day marking the end of the active 
+            growing season (Month, Day) when `dormancy_mode` is 'doy'. 
+            Defaults to (10, 31) (October 31st).
+        tmean_col (str): Column name in the input `weather` DataFrame representing 
+            the daily mean temperature. Required if `dormancy_mode` is 'temp'. 
+            Defaults to "tmean_c".
+        greenup_consecutive_days (int): Number of consecutive days that the rolling 
+            mean temperature must remain above `tbase_c` to trigger spring 
+            green-up when using 'temp' dormancy. Defaults to 5.
+        drawdown (bool): If True, has crop height gradually decrease to the h_resid_cm
+            over 14 days rather than abruptly dropping down
+    """
+    h_resid_cm: float = 5
+    h_max_cm: float = 75.0  
+    rate: Union[float, Sequence[float]] = 0.008 
+    model: str = "exp"  
+    time_mode: str = "days"  
+    tbase_c: float = 5.0  
+    tcap_c: Optional[float] = None  
     enforce_bounds: bool = True
     grazing_height: Optional[Union[float, list, tuple, np.ndarray]] = None
     # Dormancy behavior
-    dormancy_mode: str = "doy"  # 'doy', 'temp', or 'none'; under temp, active when rolling mean(tmean_c) over 'greenup_consecutive_days'  >= tbase_c
-    doy_start: Tuple[int, int] = (3, 1) # start date of active season if dormancy_mode is 'doy'
-    doy_end: Tuple[int, int] = (10, 31) # end date of active season if dormancy_mode is 'doy'
-    tmean_col: str = "tmean_c"  # used if dormancy_mode='temp' and weather provided
+    dormancy_mode: str = "temp"  
+    doy_start: Tuple[int, int] = (3, 1) 
+    doy_end: Tuple[int, int] = (10, 31) 
+    tmean_col: str = "tmean_c"  
     greenup_consecutive_days: int = 5
-
-    # Optional stress
-    use_temp_stress: bool = False
-    tmin_c: float = 0.0
-    topt_low_c: float = 15.0
-    topt_high_c: float = 27.0
-    tstop_c: float = 30.0
-
+    drawdown: bool = True
 
 def simulate_alfalfa_height_single_field(
     dates: Union[Sequence, pd.DatetimeIndex],
     cut_dates: Sequence,
     params: AlfalfaHeightParams,
     weather: Optional[pd.DataFrame] = None,
-    cut_effect: str = "post",  # 'post' means height on cut date is stubble; 'pre' means apply cut next day
+    cut_effect: str = "post",
 ) -> pd.DataFrame:  
+    """Simulates daily canopy height and active growth rates for a single alfalfa field.
+
+    This function models alfalfa growth cycle-by-cycle, resetting the canopy height 
+    to a baseline residual stubble value whenever a harvest ('cut') event occurs. 
+    It dynamically selects growth rates (k-values) and maximum height ceilings 
+    (grazing caps) for each specific cutting interval. It also handles seasonal variations, 
+    including temperature-dependent or calendar-based dormancy and a late-autumn 
+    biomass drawdown.
+
+    Growth can be modeled using standard calendar days or accumulated Growing Degree 
+    Days (GDD) if a weather dataset is supplied.
+
+    Args:
+        dates (Union[Sequence, pd.DatetimeIndex]): The target time window for the 
+            simulation. Does not need to be continuous; the function automatically 
+            builds a continuous daily timeline from the minimum to maximum date.
+        cut_dates (Sequence): Dates on which harvest cuts or grazing resets occur. 
+            Can be strings, datetimes, or pandas Timestamps.
+        params (AlfalfaHeightParams): An instance of AlfalfaHeightParams containing 
+            the crop properties, mathematical model type, thresholds, and configuration switches.
+        weather (pd.DataFrame, optional): Daily weather records. Must use a `pd.DatetimeIndex`. 
+            Required if `params.time_mode` is 'gdd' (expects columns: 'tmin_c', 'tmax_c') 
+            or if `params.dormancy_mode` is 'temp' (expects column specified by `params.tmean_col`). 
+            Defaults to None.
+        cut_effect (str, optional): Timing strategy for harvest resets. 
+            - 'post': Canopy height drops to `h_resid_cm` precisely on the cut date. 
+            - 'pre': Height drops to `h_resid_cm` the day *after* the cut date.
+            Defaults to "post".
+
+    Returns:
+        pd.DataFrame: A daily time-series DataFrame indexed by a continuous 
+        `pd.DatetimeIndex` spanning the simulation range. Contains the following columns:
+            - **height_cm** (*float*): The simulated canopy height in centimeters.
+            - **active_k** (*float*): The growth rate constant applied on that specific day.
+
+    Raises:
+        ValueError: If `cut_effect` is not configured to 'post' or 'pre'.
+        ValueError: If `weather` data lacks a `DatetimeIndex` or misses required columns 
+            stipulated by the configured `time_mode` or `dormancy_mode`.
     """
-    Simulate daily canopy height for one field with dynamic k-rates and dynamic grazing height ceilings.
-    """
+    
     idx = make_daily_index(dates)
     date_min, date_max = idx.min(), idx.max()
 
@@ -342,26 +367,9 @@ def simulate_alfalfa_height_single_field(
     else:
         active = is_active_season_by_doy(idx, params.doy_start, params.doy_end)
 
-    # Optional temperature stress factor
-    if (
-        params.use_temp_stress
-        and weather is not None
-        and params.tmean_col in weather.columns
-    ):
-        temp_stress = temperature_stress_piecewise(
-            tmean_c=weather[params.tmean_col].reindex(idx),
-            t_min_c=params.tmin_c,
-            t_opt_low_c=params.topt_low_c,
-            t_opt_high_c=params.topt_high_c,
-            t_stop_c=params.tstop_c,
-        )
-    else:
-        temp_stress = np.ones(len(idx), dtype=float)
-
     growth_fn = choose_growth_fn(params.model)
     cut_set = set(pd.DatetimeIndex(cuts))
     
-    # --- Set up arrays for BOTH height and the active k-rate ---
     heights = np.full(len(idx), np.nan, dtype=float)
     k_values = np.full(len(idx), np.nan, dtype=float)  
 
@@ -369,11 +377,10 @@ def simulate_alfalfa_height_single_field(
     current_cut_idx = 0  
     
     heights[0] = params.h_resid_cm
-    # Initialize the first day's k-rate
     k_values[0] = float(params.rate[0]) if isinstance(params.rate, (list, tuple, np.ndarray, pd.Series)) else float(params.rate)
 
     end_date = idx[-1]
-    drawdown_window = 14  # Days to transition down
+    drawdown_window = 14
     drawdown_start_date = end_date - pd.Timedelta(days=drawdown_window)
     height_at_drawdown_start = None
 
@@ -381,20 +388,21 @@ def simulate_alfalfa_height_single_field(
         d = idx[i]
         
         # Late fall drawdown execution
-        if d >= drawdown_start_date:
-            if height_at_drawdown_start == None:
-                height_at_drawdown_start = float(heights[i - 1])
+        if params.drawdown == True:
+            if d >= drawdown_start_date:
+                if height_at_drawdown_start is None:
+                    height_at_drawdown_start = float(heights[i - 1])
+                    
+                days_into_drawdown = (d - drawdown_start_date).days
+                fraction = max(0.0, (drawdown_window - days_into_drawdown) / drawdown_window)
                 
-            days_into_drawdown = (d - drawdown_start_date).days
-            fraction = max(0.0, (drawdown_window - days_into_drawdown) / drawdown_window)
-            
-            heights[i] = params.h_resid_cm + (height_at_drawdown_start - params.h_resid_cm) * fraction
-            k_values[i] = 0.0
-            continue
+                heights[i] = params.h_resid_cm + (height_at_drawdown_start - params.h_resid_cm) * fraction
+                k_values[i] = 0.0
+                continue
 
         is_cut = d in cut_set
 
-        # --- DYNAMIC K-SELECTION ---
+        # Dynamic K-Selection
         if isinstance(params.rate, (list, tuple, np.ndarray, pd.Series)):
             if current_cut_idx < len(params.rate):
                 current_k = float(params.rate[current_cut_idx])
@@ -405,7 +413,7 @@ def simulate_alfalfa_height_single_field(
             
         k_values[i] = current_k  
 
-        # --- NEW: DYNAMIC H_MAX CEILING SELECTION ---
+        # Dynamic H_MAX Ceiling Selection
         if hasattr(params, 'grazing_height') and params.grazing_height is not None:
             if isinstance(params.grazing_height, (list, tuple, np.ndarray, pd.Series)):
                 if current_cut_idx < len(params.grazing_height):
@@ -415,7 +423,6 @@ def simulate_alfalfa_height_single_field(
             else:
                 cycle_target = params.grazing_height
             
-            # If the current cycle has a grazing cap assigned, use it. Otherwise, use standard h_max_cm.
             current_h_max = float(cycle_target) if cycle_target is not None else params.h_max_cm
         else:
             current_h_max = params.h_max_cm
@@ -436,7 +443,7 @@ def simulate_alfalfa_height_single_field(
         else:
             raise ValueError("cut_effect must be 'post' or 'pre'")
 
-        # Dormancy: hold constant (no growth) if not active
+        # Dormancy: hold constant if not active
         if not active[i]:
             heights[i] = max(params.h_resid_cm, heights[i - 1])
             continue
@@ -453,18 +460,17 @@ def simulate_alfalfa_height_single_field(
             time_var_today = np.array([dt_days_today], dtype=float)
             time_var_prev = np.array([dt_days_prev], dtype=float)
 
-        # Get ideal curve heights (Updated to use current_h_max)
+        # Get ideal curve heights
         h_ideal_today = float(growth_fn(time_var_today, params.h_resid_cm, current_h_max, current_k)[0])
         h_ideal_prev = float(growth_fn(time_var_prev, params.h_resid_cm, current_h_max, current_k)[0])
 
         delta_growth = max(0.0, h_ideal_today - h_ideal_prev)
-        delta_stressed = delta_growth * float(temp_stress[i])
-        h_stressed = heights[i - 1] + delta_stressed
+        h_new = heights[i - 1] + delta_growth
 
         if params.enforce_bounds:
-            h_stressed = max(params.h_resid_cm, min(current_h_max, h_stressed))
+            h_new = max(params.h_resid_cm, min(current_h_max, h_new))
 
-        heights[i] = h_stressed
+        heights[i] = h_new
 
     return pd.DataFrame({
         "height_cm": heights,
