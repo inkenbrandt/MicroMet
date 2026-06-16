@@ -12,7 +12,6 @@ Welcome to Micromet's documentation!
    flux_workflow_summary
    flux_processing_workflow
    crop_height_estimation
-   notebooks
    modules
    about_ufn
    ameriflux_variables
