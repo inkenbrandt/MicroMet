@@ -10,6 +10,13 @@ renaming columns, lists of variables for different data types (e.g.,
 config = {
     "renames_eddy": {
         "ET": "ET_1_1_1",
+        'T_SONIC': 'T_SONIC_1_1_1',
+        "CS65X_EC_1_1_1":"EC_1_1_1",
+        "CS65X_EC_1_1_2":"EC_1_1_2",
+        "LI7700_AMB_TMPR":"TA_1_1_5",
+        'CO2_SIGMA':'CO2_SIGMA_1_1_1', 
+        'H2O_SIGMA':'H2O_SIGMA_1_1_1',
+        'T_NR': 'T_NR_1_1_1',
         "LE": "LE_1_1_1",
         "H": "H_1_1_1",
         "VPD": "VPD_1_1_1",
@@ -203,6 +210,7 @@ config = {
     },
     "renames_met": {
         "et_l": "ET_1_1_2",
+        'T_NR': 'T_NR_1_1_2',
         "le_l": "LE_1_1_2",
         "h_l": "H_1_1_2",
         "vpd_l": "VPD_1_1_2",

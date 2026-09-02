@@ -232,6 +232,18 @@ limits = {
         "Min": 0.0,
         "Max": 1.0,
     },
+    "H2O_SIG_STRGTH": {
+        "Description": "Sensor strength for detecting H2O",
+        "Units": "proportion",
+        "Min": 0.0,
+        "Max": 1.0,
+    },
+    "CO2_SIG_STRGTH": {
+        "Description": "Sensor strength for detecting CO2",
+        "Units": "proportion",
+        "Min": 0.0,
+        "Max": 1.0,
+    },
     "H2O_MIXING_RATIO": {
         "Description": "Water (H2O) vapor in mole fraction of dry air",
         "Units": "mmolH2O mol-1",
