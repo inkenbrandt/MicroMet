@@ -26,6 +26,7 @@ from .format import compare
 from .report import validate
 from .report import fix_g_values
 from .report import recalculate_albedo
+from .report import calibration_fixes
 from .report import gap_summary
 from .report import eddy_plots
 from .format import transformers
