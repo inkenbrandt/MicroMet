@@ -206,9 +206,17 @@ config = {
         "BattV": "V_BATT_EDDY",
         'V_batt': "V_BATT_EDDY",
         "BATTERY_VOLTAGE": "V_BATT_EDDY",
-        "Battery_Voltage": 'V_BATT_EDDY'
+        "Battery_Voltage": 'V_BATT_EDDY',
+        'T_nr': 'T_NR_1_1_1',
+        'T_nr_out': 'T_NR_OUT_1_1_1',
     },
     "renames_met": {
+        'T_CANOPY': 'T_CANOPY_1_1_1',
+        'T_nr': 'T_NR_1_1_2',
+        'T_nr_out': 'T_NR_OUT_1_1_2',
+        'T_SI111_BODY': 'T_SI111_BODY_1_1_1',
+        'T_SI111_body': 'T_SI111_BODY_1_1_1',
+        'PPFD_IN': 'PPFD_IN_1_1_1',
         "et_l": "ET_1_1_2",
         'T_NR': 'T_NR_1_1_2',
         "le_l": "LE_1_1_2",
@@ -554,7 +562,10 @@ config = {
         "LWmV_2": 'LWMV_1_2_1',
         "LWMWet_1": 'LEAF_WET_1_1_1',
         "LWMWet_2": 'LEAF_WET_1_2_1',
-        'LEAF_WET_1_1_2':'LEAF_WET_1_2_1'
+        'LEAF_WET_1_1_2':'LEAF_WET_1_2_1',
+        "LWmV_1_1_2": "LWMV_1_2_1",
+        "LWMDry_1_1_2":'LWMDRY_1_2_1',
+        "LWMCon_1_1_2": 'LWMCON_1_2_1'
     },
     "met_vars": [
         "ET_1_1_2",
